@@ -2,6 +2,7 @@ import { SolidRect, TileMap, moveX, moveY, supportUnder } from './physics';
 import {
   BoxState,
   DT,
+  GROUND_GHOST,
   GROUND_NONE,
   GROUND_TILE,
   PlayerState,
@@ -25,6 +26,9 @@ export const PLAYER_W = 20;
 export const PLAYER_H = 28;
 export const PLAYER_DUCK_H = 16;
 export const BOX_PUSH_SPEED = 130;
+
+/** Separation kept between a shoved object and the body that shoved it. */
+const EPS = 0.02;
 
 export interface Input {
   left: boolean;
@@ -130,6 +134,18 @@ export class World {
     return this.boxes.map((b) => ({ x: b.state.x, y: b.state.y, w: b.w, h: b.h, id: b.id }));
   }
 
+  /**
+   * Recorded bodies as solids. Ghosts are transparent to the live player but the
+   * rest of the world is not exempt from them: crates rest on them and are shoved
+   * by them, exactly as they were by the run that recorded the body.
+   */
+  ghostSolidsAt(t: number): SolidRect[] {
+    return this.ghostsAt(t).map(({ state }) => {
+      const r = playerRect(state);
+      return { x: r.x, y: r.y, w: r.w, h: r.h, id: GROUND_GHOST };
+    });
+  }
+
   ghostsAt(t: number): { run: Run; state: PlayerState }[] {
     const out: { run: Run; state: PlayerState }[] = [];
     for (const run of this.runs) {
@@ -185,19 +201,65 @@ export class World {
 
   /**
    * Moves the live body while the timeline is frozen on a device: the world is
-   * held at `now`, nothing is recorded, but the player can still walk off the pad.
+   * held at `now` and the player can still walk off the pad. Nothing is written
+   * to the timeline — the tick already has a recorded state, and overwriting it
+   * would make the run's own ghost jump to the pad whenever time revisits it.
    */
   stepPlayerFrozen(input: Input): void {
     this.stepPlayer(input);
-    this.current.states[this.now] = { ...this.player };
+  }
+
+  private otherBoxSolids(box: Box): SolidRect[] {
+    return this.boxes
+      .filter((o) => o !== box)
+      .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
+  }
+
+  /**
+   * Applies the motion of every recorded body to the objects it touches on the
+   * way from `now` to `target`: a crate standing on a ghost travels with it, and
+   * a crate in the way of one gets shoved aside.
+   */
+  private applyGhostMotion(target: number): void {
+    for (const run of this.runs) {
+      const prev = run.states[this.now];
+      const next = run.states[target];
+      if (!prev || !next) continue;
+      const pr = playerRect(prev);
+      const nr = playerRect(next);
+      const dx = nr.x - pr.x;
+      const dy = nr.y - pr.y;
+      if (dx === 0 && dy === 0) continue;
+      for (const box of this.boxes) {
+        const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
+        const others = this.otherBoxSolids(box);
+        const riding =
+          Math.abs(rect.y + rect.h - pr.y) <= 2 && rect.x < pr.x + pr.w && rect.x + rect.w > pr.x;
+        if (riding) {
+          moveX(rect, dx, this.map, others);
+          moveY(rect, dy, this.map, others);
+        } else if (rectsOverlap(nr, rect)) {
+          if (dx !== 0) {
+            const out = dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w);
+            moveX(rect, out, this.map, others);
+          } else if (dy < 0) {
+            moveY(rect, nr.y - EPS - (rect.y + rect.h), this.map, others);
+          }
+        }
+        box.state.x = rect.x;
+        box.state.y = rect.y;
+      }
+    }
   }
 
   private stepBoxesForward(target: number): void {
     const all = this.boxes;
+    this.applyGhostMotion(target);
+    const ghosts = this.ghostSolidsAt(target);
     for (const box of all) {
       box.state.vy = Math.min(box.state.vy + GRAVITY * DT, 900);
       const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
-      const others = all.filter((o) => o !== box).map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
+      const others = [...this.otherBoxSolids(box), ...ghosts];
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);
       if (v.groundedOn !== GROUND_NONE || v.ceiling) box.state.vy = 0;

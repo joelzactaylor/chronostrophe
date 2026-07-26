@@ -6,6 +6,7 @@ export const TICKS = 3600;
 
 export const GROUND_NONE = -2;
 export const GROUND_TILE = -1;
+export const GROUND_GHOST = -3;
 
 export interface Rect {
   x: number;

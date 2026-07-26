@@ -100,7 +100,46 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   check('chronoclast erases recorded history', w.runs.length === 0 && w.ghostsAt(60).length === 0);
 }
 
-// 6. The level is completable with the intended solution.
+// 6. Ghost bodies are solid for objects: they shove crates and carry them.
+{
+  const w = makeWorld();
+  const box = w.boxes[0];
+  w.player.x = box.state.x - 21;
+  w.player.y = 9 * TILE - 28;
+  run(w, 90, { ...NO_INPUT, right: true });
+  const pushedTo = box.state.x;
+  check('the recording run pushed the crate', pushedTo > box.initial.x + 10, `x=${pushedTo}`);
+
+  w.splitRun();
+  w.scrubTo(0);
+  check('the run is now history', w.runs.length === 1);
+  w.player.x = 100;
+  w.player.y = 15 * TILE - 28;
+  run(w, 90, { ...NO_INPUT });
+  check(
+    'the ghost re-pushes the crate along the same path',
+    Math.abs(box.state.x - pushedTo) < 6,
+    `x=${box.state.x} expected~${pushedTo}`,
+  );
+}
+
+// 7. A frozen timeline does not rewrite the recorded state at the tick a device holds.
+{
+  const w = makeWorld();
+  run(w, 60, { ...NO_INPUT, right: true });
+  const held = { ...w.current.states[60]! };
+  for (let i = 0; i < 90; i++) w.stepPlayerFrozen({ ...NO_INPUT, right: true });
+  check('the live body moves while the timeline is frozen', w.player.x > held.x + 20, `x=${w.player.x}`);
+  check(
+    'freezing does not overwrite the recorded state at that tick',
+    w.current.states[60]!.x === held.x && w.current.states[60]!.y === held.y,
+    `recorded x=${w.current.states[60]!.x} expected ${held.x}`,
+  );
+  w.splitRun();
+  check('the ghost stays on its recorded path at the device tick', w.ghostsAt(60)[0].state.x === held.x);
+}
+
+// 8. The level is completable with the intended solution.
 {
   const level = buildLevel();
   const w = new World(level.map, level.spawn, level.boxes);
