@@ -119,6 +119,11 @@ export class World {
     this.current = this.newRun();
   }
 
+  /** Drops a run from history — used when its contradiction turns it into a singularity. */
+  removeRun(run: Run): void {
+    this.runs = this.runs.filter((r) => r !== run);
+  }
+
   /** Chronoclast: erase all recorded player history. */
   erasePlayerHistory(): void {
     this.runs = [];
@@ -346,27 +351,26 @@ export class World {
 
   /**
    * Checks whether recorded history can still validly unfold at the current time.
-   * Ghosts pass straight through the live body; history only breaks when the
-   * world stops supporting a recorded run — a box now occupies space the run
-   * passed through, or the box it stood on has moved.
+   * Ghosts pass straight through the live body; history breaks when the world stops
+   * being able to produce the recorded run: a recorded body stands on nothing, or a
+   * box sits where the run's body was.
    */
   detectParadox(): Paradox | null {
     for (const { run, state } of this.ghostsAt(this.now)) {
       const g = playerRect(state);
+
+      // A recorded body stood on something that is no longer there. It cannot be
+      // standing on air, so the history that put it there is void.
+      if (state.groundedOn !== GROUND_NONE && supportUnder(g, this.map, this.solids()) === GROUND_NONE) {
+        return { run, tick: this.now, reason: 'a former self is standing on nothing', x: g.x, y: g.y };
+      }
+
       for (const box of this.boxes) {
-        const cur = boxRect(box);
-        if (!rectsOverlap(g, cur)) continue;
+        if (!rectsOverlap(g, boxRect(box))) continue;
         const rec = this.boxStateAt(box, this.now);
         const recRect: Rect = { x: rec.x, y: rec.y, w: box.w, h: box.h };
         if (!rectsOverlap(g, recRect)) {
-          return { run, tick: this.now, reason: 'blocked a recorded path', x: g.x, y: g.y };
-        }
-      }
-      if (state.groundedOn >= 0) {
-        const box = this.boxes[state.groundedOn];
-        const rec = this.boxStateAt(box, this.now);
-        if (Math.abs(rec.x - box.state.x) > 6 || Math.abs(rec.y - box.state.y) > 6) {
-          return { run, tick: this.now, reason: 'removed required support', x: g.x, y: g.y };
+          return { run, tick: this.now, reason: 'a crate is where a former self was', x: g.x, y: g.y };
         }
       }
     }

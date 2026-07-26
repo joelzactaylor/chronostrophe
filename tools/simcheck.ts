@@ -139,7 +139,25 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   check('the ghost stays on its recorded path at the device tick', w.ghostsAt(60)[0].state.x === held.x);
 }
 
-// 8. The level is completable with the intended solution.
+// 8. A recorded body left standing on nothing is an immediate paradox.
+{
+  const w = makeWorld();
+  const box = w.boxes[0];
+  w.player.x = box.state.x;
+  w.player.y = box.state.y - 28;
+  run(w, 20);
+  check('the run stood on the crate', w.player.groundedOn === box.id, `groundedOn=${w.player.groundedOn}`);
+  w.splitRun();
+  check('no paradox while the crate is still there', w.detectParadox() === null);
+
+  box.state.x += 300;
+  const paradox = w.detectParadox();
+  check('a ghost standing on nothing is a paradox', paradox?.reason === 'a former self is standing on nothing', `${paradox?.reason}`);
+  if (paradox) w.removeRun(paradox.run);
+  check('the contradicted run is removed from history', w.runs.length === 0 && w.detectParadox() === null);
+}
+
+// 9. The level is completable with the intended solution.
 {
   const level = buildLevel();
   const w = new World(level.map, level.spawn, level.boxes);
