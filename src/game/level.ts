@@ -129,6 +129,7 @@ function buildBallast(): LevelDef {
   const grid = corridorGrid();
   fill(grid, 30, 12, 34, 12); // gate shelf: 3 tiles up, a crate's height short of a jump
   fill(grid, 30, 13, 30, 14); // the shelf's near face, which the crate stops against
+  fill(grid, 23, 11, 23, 8); // a wall on the upper left of the monolith
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
