@@ -86,7 +86,8 @@ where it was at tick 5 while you stay where you are — with a fresh clock to sp
   rewinding then leaves a stretch of the stone sitting still to climb onto before it starts rising.
 * **Your ghosts are solid for objects but not for you.** A previous run will shove the same crates
   it shoved the first time, which is a resource. Leaving a ghost standing on a crate you then move
-  away is a paradox: the contradicted run turns into a singularity that hunts you.
+  away is a paradox: the contradicted run becomes an anomaly that retraces your own worldline at
+  double speed, and reaching your present ends the run.
 * Only what you have actually lived is recorded, so you can never scrub past `now` into the future.
 
 An overlap that no motion caused — a crate shoved into a standing body by a ghost — is undone by the

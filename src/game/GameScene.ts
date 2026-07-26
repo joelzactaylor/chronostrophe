@@ -1,26 +1,34 @@
 import Phaser from 'phaser';
-import { PlayerState, Rect, TICKS, TILE, clamp, rectsOverlap } from '../core/types';
+import { PlayerState, Rect, TILE, clamp, rectsOverlap } from '../core/types';
 import { Box, Input, World, boxRect, playerRect } from '../core/world';
 import { Device, LEVELS, LevelDef, buildLevel } from './level';
 import { FISHEYE_KEY, FisheyePipeline } from './fisheye';
 
 export type GameState = 'play' | 'death' | 'dust' | 'fisheye' | 'won';
 
-export interface Singularity {
-  path: PlayerState[];
-  idx: number;
-  x: number;
-  y: number;
-  homing: boolean;
-  born: number;
-  /** Ticks left of the fuse: the contradicted ghost burning in place before it moves. */
-  fuse: number;
-  ducking: boolean;
-  facing: 1 | -1;
+/** A step of the player's own worldline: where the body was, and when. */
+export interface LivedStep extends PlayerState {
+  /** The tick of the timeline the body occupied. */
+  tick: number;
+  /** The recording segment it belonged to. */
+  runId: number;
 }
 
-/** How long a contradicted ghost burns as a fuse ghost before it starts chasing. */
-const FUSE_TICKS = 45;
+/**
+ * A contradicted run. It keeps its ghost body and never touches the level; what it
+ * does is retrace the player's own worldline from where its history broke, two steps
+ * of lived time for every one the player lives. It is drawn wherever on that path it
+ * has reached, regardless of the tick the world is showing — being outside its own
+ * time is what it is. Reaching the present is the loss.
+ */
+export interface Anomaly {
+  /** How far along the player's lived path it has come. */
+  idx: number;
+  born: number;
+}
+
+/** Lived steps the anomaly covers per tick: the consequence outruns its cause. */
+const ANOMALY_SPEED = 2;
 
 /** Ticks of immunity after a restart or a timeline edit before history is judged again. */
 const PARADOX_GRACE = 5;
@@ -31,7 +39,7 @@ const COL_TILE_EDGE = 0x6d4bd6;
 const COL_PLAYER = 0xf7e26b;
 const COL_GHOST = 0x76d9ff;
 const COL_BOX = 0xd98b45;
-const COL_SINGULARITY = 0xff4d6d;
+const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
 
 export const VIEW_W = 960;
@@ -43,7 +51,9 @@ export class GameScene extends Phaser.Scene {
   state: GameState = 'play';
   message = '';
   activeDevice: Device | null = null;
-  singularities: Singularity[] = [];
+  anomalies: Anomaly[] = [];
+  /** Every step the body has lived, in the order it lived them. */
+  livedPath: LivedStep[] = [];
   lastParadoxReason = '';
   levelIndex = 0;
   get hasNextLevel(): boolean {
@@ -79,7 +89,8 @@ export class GameScene extends Phaser.Scene {
     );
     this.state = 'play';
     this.message = '';
-    this.singularities = [];
+    this.anomalies = [];
+    this.livedPath = [];
     this.acc = 0;
     this.effectT = 0;
     this.paradoxGrace = PARADOX_GRACE;
@@ -216,21 +227,28 @@ export class GameScene extends Phaser.Scene {
     if (world.paused) {
       // Timeline frozen on a device: the live body still moves, history does not.
       world.stepPlayerFrozen(input);
+      // Time is standing still, but the body is still living steps, so an anomaly
+      // retracing them still gains: waiting on a pad is not a hiding place.
+      this.recordLivedStep();
+      this.advanceAnomalies();
+      if (this.anomalies.some((a) => a.idx >= this.livedPath.length - 1)) {
+        this.fail('fisheye', 'ANOMALY CAUGHT UP');
+      }
       return;
     }
 
     world.step(input);
     if (this.paradoxGrace > 0) this.paradoxGrace--;
 
-    this.advanceSingularities();
+    this.recordLivedStep();
+    this.advanceAnomalies();
 
     if (this.paradoxGrace === 0) {
       const paradox = world.detectParadox();
       if (paradox) {
         this.paradoxGrace = PARADOX_GRACE;
         this.lastParadoxReason = paradox.reason;
-        // The contradicted ghost is not a ghost any more: it becomes the fuse.
-        this.spawnSingularity(paradox.tick, paradox.run.states, paradox.run.dir);
+        this.spawnAnomaly(paradox.run.id);
         world.removeRun(paradox.run);
         this.message = `PARADOX — ${paradox.reason.toUpperCase()}`;
       }
@@ -247,10 +265,9 @@ export class GameScene extends Phaser.Scene {
       const crushed = rectsOverlap(pr, { x: br.x + 3, y: br.y + 3, w: br.w - 6, h: br.h - 6 });
       if (crushed) return this.fail('death', 'CRUSHED');
     }
-    for (const s of this.singularities) {
-      if (s.fuse <= 0 && rectsOverlap(pr, { x: s.x, y: s.y, w: 20, h: 28 })) {
-        return this.fail('fisheye', 'SINGULARITY CAPTURE');
-      }
+    // The anomaly catches you by reaching your present, not by touching you.
+    if (this.anomalies.some((a) => a.idx >= this.livedPath.length - 1)) {
+      return this.fail('fisheye', 'ANOMALY CAUGHT UP');
     }
     const ex = this.level.exit;
     if (rectsOverlap(pr, { x: ex.x - ex.r, y: ex.y - ex.r, w: ex.r * 2, h: ex.r * 2 })) {
@@ -273,7 +290,8 @@ export class GameScene extends Phaser.Scene {
       if (this.lastClast !== found) {
         this.lastClast = found;
         world.erasePlayerHistory();
-        this.singularities = [];
+        this.anomalies = [];
+        this.livedPath = [];
         this.paradoxGrace = PARADOX_GRACE;
         this.message = 'CHRONOCLAST — RECORDED HISTORY ERASED';
       }
@@ -299,53 +317,32 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private spawnSingularity(tick: number, states: (PlayerState | undefined)[], runDir: 1 | -1): void {
-    const path: PlayerState[] = [];
-    for (let t = tick; t >= 0 && t <= TICKS; t += runDir) {
-      const s = states[t];
-      if (!s) break;
-      path.push(s);
-    }
-    if (path.length < 1) return;
-    this.singularities.push({
-      path,
-      idx: 0,
-      x: path[0].x,
-      y: path[0].y,
-      homing: path.length < 2,
-      born: this.time.now,
-      fuse: FUSE_TICKS,
-      ducking: path[0].ducking,
-      facing: path[0].facing,
-    });
+  private recordLivedStep(): void {
+    const p = this.world.player;
+    this.livedPath.push({ ...p, tick: this.world.now, runId: this.world.current.id });
   }
 
-  private advanceSingularities(): void {
-    const p = this.world.player;
-    for (const s of this.singularities) {
-      if (s.fuse > 0) {
-        s.fuse--;
-        continue;
-      }
-      if (!s.homing) {
-        // Double speed: the consequence outruns the history that produced it.
-        s.idx += 2;
-        if (s.idx >= s.path.length) {
-          s.homing = true;
-        } else {
-          s.x = s.path[s.idx].x;
-          s.y = s.path[s.idx].y;
-        }
-      }
-      if (s.homing) {
-        const dx = p.x - s.x;
-        const dy = p.y - s.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const speed = 3.1;
-        s.x += (dx / len) * speed;
-        s.y += (dy / len) * speed;
-      }
+  /** The anomaly starts where the run it came from started, and gains on you from there. */
+  private spawnAnomaly(runId: number): void {
+    const from = this.livedPath.findIndex((s) => s.runId === runId);
+    this.anomalies.push({ idx: from < 0 ? 0 : from, born: this.time.now });
+  }
+
+  private advanceAnomalies(): void {
+    for (const a of this.anomalies) {
+      a.idx = Math.min(a.idx + ANOMALY_SPEED, this.livedPath.length - 1);
     }
+  }
+
+  /** Lived steps between the nearest anomaly and the present, or null if there is none. */
+  anomalyLead(): number | null {
+    if (this.anomalies.length === 0) return null;
+    const closest = Math.max(...this.anomalies.map((a) => a.idx));
+    return Math.max(0, this.livedPath.length - 1 - closest);
+  }
+
+  anomalySteps(): LivedStep[] {
+    return this.anomalies.map((a) => this.livedPath[a.idx]).filter((s): s is LivedStep => !!s);
   }
 
   // ---------------------------------------------------------------- fails
@@ -426,7 +423,7 @@ export class GameScene extends Phaser.Scene {
     for (const box of this.world.boxes) this.drawBox(g, box);
     this.drawDevices(g);
     for (const { state } of this.world.ghostsAt(this.world.now)) this.drawGhost(g, state);
-    for (const s of this.singularities) this.drawSingularity(g, s);
+    for (const s of this.anomalySteps()) this.drawAnomaly(g, s);
     if (this.state !== 'death' && this.state !== 'dust') this.drawPlayer(g);
   }
 
@@ -497,10 +494,10 @@ export class GameScene extends Phaser.Scene {
     const h = floorY - top;
     if (h <= 0) return;
     const breathe = 0.06 + 0.03 * Math.sin(this.time.now / 700);
-    g.fillStyle(COL_SINGULARITY, breathe).fillRect(r.x, top, r.w, h);
-    g.fillStyle(COL_SINGULARITY, breathe * 1.6).fillRect(r.x, floorY - r.h, r.w, r.h);
+    g.fillStyle(COL_ANOMALY, breathe).fillRect(r.x, top, r.w, h);
+    g.fillStyle(COL_ANOMALY, breathe * 1.6).fillRect(r.x, floorY - r.h, r.w, r.h);
     // Diagonal hatching across the footprint.
-    g.lineStyle(1, COL_SINGULARITY, 0.22);
+    g.lineStyle(1, COL_ANOMALY, 0.22);
     for (let x = r.x - r.h; x < r.x + r.w; x += 12) {
       const x0 = Math.max(r.x, x);
       const y0 = floorY - r.h + (x0 - x);
@@ -508,7 +505,7 @@ export class GameScene extends Phaser.Scene {
       const y1 = floorY - (x + r.h - x1);
       if (x1 > x0) g.lineBetween(x0, y0, x1, y1);
     }
-    g.lineStyle(1, COL_SINGULARITY, 0.3);
+    g.lineStyle(1, COL_ANOMALY, 0.3);
     g.lineBetween(r.x, floorY - r.h, r.x + r.w, floorY - r.h);
   }
 
@@ -587,36 +584,22 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(1, COL_GHOST, 0.55).strokeRect(r.x, r.y, r.w, r.h);
   }
 
-  /** A contradicted ghost, burning where its history broke, about to come after you. */
-  private drawFuseGhost(g: Phaser.GameObjects.Graphics, s: Singularity): void {
-    const t = this.time.now / 90;
-    const heat = 1 - s.fuse / FUSE_TICKS;
-    this.drawBody(g, s, COL_SINGULARITY, 0.55 + heat * 0.45);
+  /**
+   * An anomaly is a ghost out of its time: the same translucent body as any other
+   * former self, pulsing red, with nothing solid about it. The pulse is the whole
+   * warning — how close it is is read off the HUD.
+   */
+  private drawAnomaly(g: Phaser.GameObjects.Graphics, s: LivedStep): void {
+    const lead = this.anomalyLead() ?? 0;
+    const urgency = 1 - Math.min(1, lead / 240);
+    const pulse = 0.5 + 0.5 * Math.sin(this.time.now / (150 - urgency * 90));
+    this.drawBody(g, s, COL_ANOMALY, 0.3 + 0.35 * pulse);
     const r = playerRect(s);
-    for (let i = 3; i >= 1; i--) {
-      g.lineStyle(2, i % 2 === 0 ? 0xffd166 : COL_SINGULARITY, (0.15 + heat * 0.25) * i * 0.5);
-      const pad = i * 4 + Math.sin(t * 2 + i) * 2;
-      g.strokeRect(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2);
-    }
-    for (let i = 0; i < 6; i++) {
-      const a = t * 3 + (i * Math.PI) / 3;
-      const rad = 14 + Math.sin(t * 4 + i) * 5;
-      g.fillStyle(i % 2 === 0 ? 0xffd166 : 0xffffff, 0.5 + heat * 0.5);
-      g.fillRect(r.x + r.w / 2 + Math.cos(a) * rad, r.y + r.h / 2 + Math.sin(a) * rad, 3, 3);
-    }
-  }
-
-  private drawSingularity(g: Phaser.GameObjects.Graphics, s: Singularity): void {
-    if (s.fuse > 0) return this.drawFuseGhost(g, s);
-    const t = this.time.now / 120;
-    const r: Rect = { x: s.x, y: s.y, w: 20, h: 28 };
-    for (let i = 3; i >= 1; i--) {
-      g.fillStyle(COL_SINGULARITY, 0.08 * i);
-      g.fillCircle(r.x + 10, r.y + 14, 16 + i * 6 + Math.sin(t + i) * 2);
-    }
-    g.fillStyle(0x1a0410, 0.95).fillRect(r.x, r.y, r.w, r.h);
-    g.lineStyle(2, COL_SINGULARITY, 0.9).strokeRect(r.x, r.y, r.w, r.h);
-    g.fillStyle(COL_SINGULARITY, 1).fillRect(r.x + 4, r.y + 6, 4, 4);
-    g.fillStyle(COL_SINGULARITY, 1).fillRect(r.x + 12, r.y + 6, 4, 4);
+    g.lineStyle(1, COL_ANOMALY, 0.35 + 0.5 * pulse).strokeRect(r.x, r.y, r.w, r.h);
+    // A displaced tick reads as a rip rather than a body: the outline is doubled,
+    // offset by the distance it is out of time.
+    const slip = 2 + 3 * pulse;
+    g.lineStyle(1, COL_ANOMALY, 0.18 + 0.22 * pulse).strokeRect(r.x - slip, r.y + slip, r.w, r.h);
+    g.lineStyle(1, COL_GHOST, 0.12 + 0.2 * pulse).strokeRect(r.x + slip, r.y - slip, r.w, r.h);
   }
 }

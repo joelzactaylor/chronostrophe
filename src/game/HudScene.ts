@@ -26,6 +26,7 @@ export class HudScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   private abandon!: Phaser.GameObjects.Text;
   private menu!: Phaser.GameObjects.Text;
+  private anomaly!: Phaser.GameObjects.Text;
   private dragging = false;
 
   constructor() {
@@ -72,6 +73,14 @@ export class HudScene extends Phaser.Scene {
         ...font,
         fontSize: '12px',
         color: '#b9c3ea',
+      })
+      .setOrigin(0.5);
+
+    this.anomaly = this.add
+      .text(VIEW_W / 2, VIEW_H - 34, '', {
+        ...font,
+        fontSize: '13px',
+        color: '#ff8fa3',
       })
       .setOrigin(0.5);
 
@@ -180,6 +189,16 @@ export class HudScene extends Phaser.Scene {
         (scene.canScrub() ? '    ·    drag the slider' : ''),
     );
 
+    // How much lived time is left before an anomaly reaches the present.
+    const lead = scene.anomalyLead();
+    if (lead === null) {
+      this.anomaly.setText('');
+    } else {
+      const left = (lead / 60).toFixed(2);
+      this.anomaly.setText(`ANOMALY CLOSING — ${left}s OF YOUR OWN PATH LEFT`);
+      this.anomaly.setColor(lead < 120 ? '#ffffff' : '#ff8fa3');
+    }
+
     this.drawOverlay(scene);
   }
 
@@ -201,7 +220,7 @@ export class HudScene extends Phaser.Scene {
         break;
       case 'fisheye':
         this.banner.setText('PARADOX COLLAPSE').setColor('#ff4d6d');
-        this.hint.setText('A singularity caught you.');
+        this.hint.setText('An anomaly caught up with your own worldline.');
         break;
       case 'death':
         this.banner.setText('DEAD').setColor('#ff4d6d');

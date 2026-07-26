@@ -61,9 +61,9 @@ the menu is the first thing the game shows, and `ESC` returns to it.
 | --- | --- |
 | chronoporter | pauses the timeline while stood on; drag the slider anywhere inside the bounds, then step off to resume in the same direction from the new point |
 | anachroverter | pauses the timeline and flips the direction of time with `R` |
-| chronoclast | on contact, erases all recorded player history: ghosts, singularities and every history-dependent consequence |
+| chronoclast | on contact, erases all recorded player history: ghosts, anomalies and every history-dependent consequence |
 
-## Paradox and singularities
+## Paradox and anomalies
 
 A paradox is not "touching a ghost" — you can walk straight through your former selves. It is
 invalidating the world conditions a recorded run needed:
@@ -71,15 +71,20 @@ invalidating the world conditions a recorded run needed:
 * a former self is left **standing on nothing** — the crate that held it up is somewhere else now;
 * a crate sits **where a former self's body was**, and the ghost cannot shove it clear.
 
-The moment that happens the ghost stops being history: it is replaced by a **fuse ghost** that burns
-red where the contradiction occurred, then ignites into a **singularity** which replays the
-contradicted run from that point at double speed and finally homes in on you. Capture warps the screen
-through a fisheye collapse and restarts the level.
+The moment that happens the run stops being history and becomes an **anomaly**. It keeps its ghost
+body — translucent, pulsing red, with no interaction with the level at all — and instead of chasing
+you across the room it chases you through time: it retraces *your* worldline from where its history
+broke, two lived steps for every one you live, and is drawn wherever on that path it has got to
+regardless of the tick the world is currently showing. Being out of its own time is the point of it.
+The HUD counts how much of your own path is left in front of it; when it runs out the anomaly has
+reached your present, and the run collapses through a fisheye warp. Standing still does not help —
+you keep living steps on a pad — but a chronoclast erases the path it is walking.
 
 ## Fail states
 
-hazard contact · reaching the beginning of time · reaching the end of time · singularity capture.
-Time-bound failure dissolves the level into dust; capture uses the fisheye collapse.
+hazard contact · being crushed · reaching the beginning of time · reaching the end of time · an
+anomaly reaching your present. Time-bound failure dissolves the level into dust; the anomaly uses the
+fisheye collapse.
 
 ## Layout
 
