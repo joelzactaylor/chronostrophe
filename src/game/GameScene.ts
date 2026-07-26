@@ -303,7 +303,7 @@ export class GameScene extends Phaser.Scene {
     if (pausing && this.activeDevice !== found) {
       this.activeDevice = found;
       world.paused = true;
-      this.message = found!.label;
+      this.message = '';
     } else if (!pausing && this.activeDevice) {
       // Stepping off a pausing pad always closes the recording segment: the body
       // moved while the timeline stood still, so what follows is a new worldline.
@@ -337,6 +337,15 @@ export class GameScene extends Phaser.Scene {
     for (const a of this.anomalies) {
       a.idx = Math.min(a.idx + ANOMALY_SPEED, this.livedPath.length - 1);
     }
+  }
+
+  /** How the pad underfoot is worked, for as long as the body is stood on it. */
+  deviceHint(): string | null {
+    const d = this.activeDevice;
+    if (!d) return null;
+    return d.kind === 'anachroverter'
+      ? `${d.label} — [R] reverses the direction of time`
+      : `${d.label} — drag the slider to move the world through time`;
   }
 
   /** Lived steps between the nearest anomaly and the present, or null if there is none. */

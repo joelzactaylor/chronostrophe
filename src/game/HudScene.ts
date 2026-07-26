@@ -182,10 +182,11 @@ export class HudScene extends Phaser.Scene {
     this.clock.setText(`T ${secs}s`);
     this.dirText.setText(w.paused ? 'PAUSED' : w.dir === 1 ? 'FORWARD' : 'REVERSE');
     this.dirText.setColor(w.paused ? '#8892bd' : w.dir === 1 ? '#76d9ff' : '#f7a1ff');
-    // The name of the level, and whatever just happened to it. Nothing else: what a
-    // device does and where a stone will fall are the puzzle.
+    // The name of the level; no brief, because where a stone falls is the puzzle.
     const level = `${scene.levelIndex + 1}. ${scene.level.name.toUpperCase()}`;
-    this.status.setText(scene.message ? `${level}    ·    ${scene.message}` : level);
+    // Whatever just happened, or - while stood on a pad - how that pad is worked.
+    const said = scene.message || scene.deviceHint();
+    this.status.setText(said ? `${level}    ·    ${said}` : level);
 
     // How much lived time is left before an anomaly reaches the present.
     const lead = scene.anomalyLead();
