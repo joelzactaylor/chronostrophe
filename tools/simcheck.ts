@@ -560,5 +560,88 @@ function levelWorld(level: LevelDef): World {
   );
 }
 
+// 19. A monolith rests on a crate that is under it: a crate is the one thing that
+// takes its weight.
+{
+  const level = buildLevel(2);
+  const w = levelWorld(level);
+  const crate = w.boxes[0];
+  const stone = w.boxes[1];
+  const floorTop = 15 * TILE;
+  crate.state.x = stone.state.x + 40;
+  crate.state.y = floorTop - crate.h;
+  crate.initial = { ...crate.state };
+
+  w.player.x = 64;
+  run(w, stone.releaseTick + 90, NO_INPUT);
+  check(
+    'a monolith comes to rest on a crate underneath it',
+    Math.abs(stone.state.y + stone.h - crate.state.y) < 1.5,
+    `stone bottom=${stone.state.y + stone.h} crate top=${crate.state.y}`,
+  );
+  check('and the crate is not shifted sideways by it', Math.abs(crate.state.x - (stone.state.x + 40)) < 1, `crate x=${crate.state.x}`);
+}
+
+// 20. Nothing else stops a monolith: a former self standing under it is not a floor,
+// and its own history could not have survived, which is a paradox.
+{
+  const level = buildLevel(2);
+  const w = levelWorld(level);
+  const stone = w.boxes[1];
+  const floorTop = 15 * TILE;
+
+  // A long run standing well clear of the stone, so the ghost is present throughout.
+  const stoodAt = { x: 200, y: floorTop - 28 };
+  w.player.x = stoodAt.x;
+  w.player.y = stoodAt.y;
+  run(w, stone.releaseTick + 200, NO_INPUT);
+  w.splitRun();
+  // Now hang the stone over that spot and replay from before it was let go.
+  stone.initial = { ...stone.initial, x: stoodAt.x - 50 };
+  w.scrubTo(10);
+  check('a ghost stands where the stone will fall', w.ghostsAt(w.now).length === 1);
+
+  w.player.x = 64; // the live body is elsewhere
+  w.player.y = floorTop - 28;
+  let paradox = null;
+  for (let i = 0; i < stone.releaseTick + 150 && !paradox; i++) {
+    w.step(NO_INPUT);
+    paradox = w.detectParadox();
+  }
+  check(
+    'a monolith falling through a former self is a paradox',
+    paradox?.reason === 'a former self was crushed by a monolith',
+    `${paradox?.reason}`,
+  );
+  check(
+    'and the ghost did not hold the stone up',
+    stone.state.y + stone.h >= stoodAt.y + 4,
+    `stone bottom=${stone.state.y + stone.h} ghost top=${stoodAt.y}`,
+  );
+}
+
+// 21. A ghost cannot shove a monolith the way it shoves a crate.
+{
+  const level = buildLevel(2);
+  const w = levelWorld(level);
+  const stone = w.boxes[1];
+  const floorTop = 15 * TILE;
+
+  w.player.x = stone.state.x - 30;
+  w.player.y = floorTop - 28;
+  run(w, 60, { ...NO_INPUT, right: true });
+  w.splitRun();
+  w.scrubTo(5);
+  w.player.x = 64;
+  w.player.y = floorTop - 28;
+  const restX = stone.state.x;
+  run(w, stone.releaseTick + 120, NO_INPUT);
+  check(
+    'a monolith is never moved sideways, ghost or otherwise',
+    Math.abs(stone.state.x - restX) < 0.5,
+    `stone x=${stone.state.x} was ${restX}`,
+  );
+}
+
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);
 console.log('\nall simulation checks passed');

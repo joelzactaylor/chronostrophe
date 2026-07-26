@@ -63,6 +63,13 @@ the menu is the first thing the game shows, and `ESC` returns to it.
 | anachroverter | pauses the timeline and flips the direction of time with `R` |
 | chronoclast | on contact, erases all recorded player history: ghosts, anomalies and every history-dependent consequence |
 
+## Monoliths
+
+A suspended monolith is let go at its tick and then nothing negotiates with it: pads, former selves
+and your own body do not stop it, and nothing can shove it sideways. The single exception is a crate
+directly underneath, which takes its weight and holds it up. A former self caught where it falls is
+destroyed, which contradicts that run and spawns an anomaly.
+
 ## Paradox and anomalies
 
 A paradox is not "touching a ghost" — you can walk straight through your former selves. It is

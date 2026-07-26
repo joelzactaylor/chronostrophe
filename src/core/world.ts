@@ -289,6 +289,8 @@ export class World {
       const dy = nr.y - pr.y;
       if (dx === 0 && dy === 0) continue;
       for (const box of this.boxes) {
+        // A monolith is not shoved or carried by anything, least of all a memory.
+        if (box.immovable) continue;
         if (claimed.has(box.id) || target < box.releaseTick) continue;
         const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         const others = this.otherBoxSolids(box);
@@ -326,7 +328,13 @@ export class World {
       }
       box.state.vy = Math.min(box.state.vy + GRAVITY * DT, 900);
       const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
-      const others = [...this.otherBoxSolids(box), ...ghosts];
+      // A monolith is stopped by the ground and by whatever crate is under it, and by
+      // nothing else: not by a pad, not by a former self, and never sideways.
+      const others = box.immovable
+        ? this.boxes
+            .filter((o) => o !== box && !o.immovable)
+            .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
+        : [...this.otherBoxSolids(box), ...ghosts];
       if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);
@@ -424,6 +432,15 @@ export class World {
   detectParadox(): Paradox | null {
     for (const { run, state } of this.ghostsAt(this.now)) {
       const g = playerRect(state);
+
+      // A monolith goes through anything that is not holding it up, a former self
+      // included: the run that walked there cannot have survived it.
+      for (const box of this.boxes) {
+        if (!box.immovable || this.now < box.releaseTick) continue;
+        if (rectsOverlap(g, boxRect(box))) {
+          return { run, tick: this.now, reason: 'a former self was crushed by a monolith', x: g.x, y: g.y };
+        }
+      }
 
       // A recorded body stood on a crate that is no longer under it. It cannot be
       // standing on air, so the history that put it there is void. Tile support is

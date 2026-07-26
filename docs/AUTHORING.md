@@ -57,7 +57,7 @@ Two consequences worth memorising, because most of the existing puzzles are buil
 
 ```ts
 { x, y, w, h }                                  // a crate: pushable, falls, rides other boxes
-{ x, y, w, h, immovable: true, releaseTick: R } // a stone: held in the air until tick R
+{ x, y, w, h, immovable: true, releaseTick: R } // a monolith: held in the air until tick R
 monolith(cx, R)                                 // the standard 4x3 stone, hung at row 2
 pad('chronoporter'  , cx, surfaceRow, label)    // stand on it to scrub the timeline
 pad('anachroverter' , cx, surfaceRow, label)    // stand on it and press R to flip time's direction
@@ -66,9 +66,14 @@ hazards: [{ x, y, w, h }]                       // spikes: touching them kills
 exit:    { x, y, r }                            // the gate, as a centre and a radius
 ```
 
+A monolith is unstoppable except by a crate directly beneath it: it ignores pads, ghosts and the
+live body, is never shoved sideways by anything, and a former self caught under it is destroyed —
+which contradicts that run and spawns an anomaly. A crate under it takes its weight, so a monolith
+can be parked at crate height on purpose.
+
 A pad's `surfaceRow` is the row it sits *on top of*, so `pad('chronoporter', 20, 15, …)` is on the
 floor at row 15. A pad is a volume the player fits inside — one tile wide, `PLAYER_H + 6` tall — and
-it is **solid to objects but open to the live body**, so crates and stones stop against it and never
+it is **solid to objects but open to the live body**, so crates stop against it and never
 settle in the space you have to stand in. A pad in a crate's path is therefore a wall for the crate:
 put pads where the crate does not have to travel.
 
