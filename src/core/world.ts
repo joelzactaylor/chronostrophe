@@ -403,11 +403,8 @@ export class World {
   /** The player is weightless but can shove live boxes sideways. */
   private pushBox(box: Box, dirSign: number, playerRectAfter: Rect): void {
     if (!box || dirSign === 0 || box.immovable) return;
-    const others = this.boxes
-      .filter((o) => o !== box)
-      .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
     const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
-    moveX(rect, dirSign * BOX_PUSH_SPEED * DT, this.map, others);
+    moveX(rect, dirSign * BOX_PUSH_SPEED * DT, this.map, this.otherBoxSolids(box));
     box.state.x = rect.x;
     playerRectAfter.x =
       dirSign > 0 ? box.state.x - playerRectAfter.w - 0.02 : box.state.x + box.w + 0.02;

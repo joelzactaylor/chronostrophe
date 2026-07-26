@@ -501,6 +501,31 @@ function levelWorld(level: LevelDef): World {
     crate.state.x + crate.w <= pad.x + 1,
     `crate x=${crate.state.x} pad x=${pad.x}`,
   );
+  check(
+    'a crate shoved at a device does not climb on top of it',
+    crate.state.y >= 15 * TILE - crate.h - 0.5,
+    `crate y=${crate.state.y}`,
+  );
+}
+
+// 17. The same from the other side: a crate shoved leftwards stops at the pad's
+// right face instead of being lifted onto it.
+{
+  const level = buildLevel(2);
+  const w = levelWorld(level);
+  const pad = level.devices[0].rect;
+  const crate = w.boxes[0];
+  crate.state.x = pad.x + pad.w + 90;
+  crate.state.y = 15 * TILE - crate.h;
+  w.player.x = crate.state.x + crate.w + 4;
+  w.player.y = 15 * TILE - 28;
+  for (let i = 0; i < 240; i++) w.step({ ...NO_INPUT, left: true });
+
+  check(
+    'a crate shoved leftwards stops at the device face',
+    crate.state.x >= pad.x + pad.w - 1 && crate.state.y >= 15 * TILE - crate.h - 0.5,
+    `crate x=${crate.state.x} y=${crate.state.y} pad right=${pad.x + pad.w}`,
+  );
 }
 
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);
