@@ -215,6 +215,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     const pr = playerRect(world.player);
+    // Being shoved further than your own width means something closed on you.
+    if (world.crushed) return this.fail('death', 'CRUSHED');
     for (const h of this.level.hazards) {
       if (rectsOverlap(pr, h)) return this.fail('death', 'KILLED BY HAZARD');
     }
