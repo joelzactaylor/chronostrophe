@@ -23,7 +23,7 @@ export interface Singularity {
 const FUSE_TICKS = 45;
 
 /** Ticks of immunity after a restart or a timeline edit before history is judged again. */
-const PARADOX_GRACE = 30;
+const PARADOX_GRACE = 5;
 
 const COL_BG = 0x0b0714;
 const COL_TILE = 0x241a44;
