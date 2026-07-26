@@ -25,8 +25,6 @@ export const PLAYER_W = 20;
 export const PLAYER_H = 28;
 export const PLAYER_DUCK_H = 16;
 export const BOX_PUSH_SPEED = 130;
-/** How long the live body may share space with a ghost before history breaks. */
-export const OVERLAP_PARADOX_TICKS = 24;
 
 export interface Input {
   left: boolean;
@@ -75,7 +73,6 @@ export class World {
   paused = false;
 
   private nextRunId = 0;
-  private ghostOverlap = new Map<number, number>();
   private coyote = 0;
   private buffered = 0;
   private spawn: { x: number; y: number };
@@ -121,7 +118,6 @@ export class World {
   /** Chronoclast: erase all recorded player history. */
   erasePlayerHistory(): void {
     this.runs = [];
-    this.ghostOverlap.clear();
     this.current = this.newRun();
     this.recordPlayer();
   }
@@ -288,24 +284,13 @@ export class World {
 
   /**
    * Checks whether recorded history can still validly unfold at the current time.
-   * A ghost is contradicted when the live player blocks it, a box now occupies
-   * space its recorded run passed through, or the box it stood on has moved.
+   * Ghosts pass straight through the live body; history only breaks when the
+   * world stops supporting a recorded run — a box now occupies space the run
+   * passed through, or the box it stood on has moved.
    */
   detectParadox(): Paradox | null {
-    const live = playerRect(this.player);
     for (const { run, state } of this.ghostsAt(this.now)) {
       const g = playerRect(state);
-      const core = { x: g.x + 5, y: g.y + 5, w: g.w - 10, h: g.h - 10 };
-      if (rectsOverlap(core, live)) {
-        // Brushing past your own history is survivable; standing in its way is not.
-        const held = (this.ghostOverlap.get(run.id) ?? 0) + 1;
-        this.ghostOverlap.set(run.id, held);
-        if (held >= OVERLAP_PARADOX_TICKS) {
-          return { run, tick: this.now, reason: 'occupied recorded space', x: g.x, y: g.y };
-        }
-      } else {
-        this.ghostOverlap.set(run.id, 0);
-      }
       for (const box of this.boxes) {
         const cur = boxRect(box);
         if (!rectsOverlap(g, cur)) continue;

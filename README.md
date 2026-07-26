@@ -27,8 +27,9 @@ npm run build      # production bundle in dist/
   into either bound while time is live ends the universe.
 * **Everything is recorded.** Player runs and rigid-body worldlines are written into the timeline
   tick by tick. Scrubbing reconstructs the world from that record instead of re-simulating it.
-* **Ghosts are real.** Previous recorded runs are rendered and collided with as physically present
-  bodies at their historically correct positions; the live body is marked with a glow and a pip.
+* **Ghosts are real, but not solid.** Previous recorded runs are present at their historically
+  correct positions and the world is accountable to them, but the live body passes through them;
+  the live body is marked with a glow and a pip.
 * **Reverse time replays worldlines.** A rewinding box does not get a fresh backward force
   simulation — it retraces its recorded path frame by frame, while remaining a real collider. That
   is what makes the level's core trick work: push a crate off a shelf, dive after it, reverse time,
@@ -46,9 +47,9 @@ npm run build      # production bundle in dist/
 
 ## Paradox and singularities
 
-A paradox is not "touching a ghost". It is invalidating the world conditions a recorded run needed:
-standing where the recorded body has to be, moving a box into its recorded path, or removing the box
-it stood on. When that happens the contradiction spawns a **singularity** that replays the
+A paradox is not "touching a ghost" — you can walk straight through your former selves. It is
+invalidating the world conditions a recorded run needed: moving a box into its recorded path, or
+removing the box it stood on. When that happens the contradiction spawns a **singularity** that replays the
 contradicted run from the interference point at double speed and then homes in on you. Capture warps
 the screen through a fisheye collapse and restarts the level.
 

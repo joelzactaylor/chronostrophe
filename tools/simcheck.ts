@@ -4,8 +4,8 @@
  * mechanic the level is built around. Run with `npm run check:sim`.
  */
 import { buildLevel } from '../src/game/level';
-import { NO_INPUT, OVERLAP_PARADOX_TICKS, World, playerRect } from '../src/core/world';
-import { Input, Paradox } from '../src/core/world';
+import { NO_INPUT, World, playerRect } from '../src/core/world';
+import { Input } from '../src/core/world';
 import { TILE } from '../src/core/types';
 
 const failures: string[] = [];
@@ -89,10 +89,9 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
 
   w.player.x = w.ghostsAt(60)[0].state.x;
   w.player.y = w.ghostsAt(60)[0].state.y;
-  let paradox: Paradox | null = null;
-  for (let i = 0; i < OVERLAP_PARADOX_TICKS && !paradox; i++) paradox = w.detectParadox();
-  check('a brush against history is survivable for a moment', OVERLAP_PARADOX_TICKS > 1);
-  check('standing inside recorded history creates a paradox', paradox !== null);
+  let paradox = null;
+  for (let i = 0; i < 120 && !paradox; i++) paradox = w.detectParadox();
+  check('ghosts are pass-through: standing inside one is not a paradox', paradox === null);
 
   w.player.x = ghostPos.x + 400;
   check('standing clear of history is safe', w.detectParadox() === null);
