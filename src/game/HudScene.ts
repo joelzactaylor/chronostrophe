@@ -182,12 +182,10 @@ export class HudScene extends Phaser.Scene {
     this.clock.setText(`T ${secs}s`);
     this.dirText.setText(w.paused ? 'PAUSED' : w.dir === 1 ? 'FORWARD' : 'REVERSE');
     this.dirText.setColor(w.paused ? '#8892bd' : w.dir === 1 ? '#76d9ff' : '#f7a1ff');
-    const ghosts = w.ghostsAt(w.now).length;
+    // The name of the level, and whatever just happened to it. Nothing else: what a
+    // device does and where a stone will fall are the puzzle.
     const level = `${scene.levelIndex + 1}. ${scene.level.name.toUpperCase()}`;
-    this.status.setText(
-      `${level}    ·    ${scene.message || scene.level.brief}    ·    ghosts:${ghosts}  runs:${w.runs.length}` +
-        (scene.canScrub() ? '    ·    drag the slider' : ''),
-    );
+    this.status.setText(scene.message ? `${level}    ·    ${scene.message}` : level);
 
     // How much lived time is left before an anomaly reaches the present.
     const lead = scene.anomalyLead();
@@ -208,11 +206,7 @@ export class HudScene extends Phaser.Scene {
       case 'won':
         g.fillStyle(0x05030a, 0.72).fillRect(0, 0, VIEW_W, VIEW_H);
         this.banner.setText('TIMELINE RESOLVED').setColor('#f7e26b');
-        this.hint.setText(
-          scene.hasNextLevel
-            ? 'You slipped through the singularity gate.\n[ENTER] next level'
-            : 'You slipped through the singularity gate.\n[ENTER] play again',
-        );
+        this.hint.setText(scene.hasNextLevel ? '[ENTER] next level' : '[ENTER] play again');
         break;
       case 'dust':
         this.banner.setText('THE UNIVERSE ENDS').setColor('#d6b3ff');
@@ -220,7 +214,7 @@ export class HudScene extends Phaser.Scene {
         break;
       case 'fisheye':
         this.banner.setText('PARADOX COLLAPSE').setColor('#ff4d6d');
-        this.hint.setText('An anomaly caught up with your own worldline.');
+        this.hint.setText(scene.message);
         break;
       case 'death':
         this.banner.setText('DEAD').setColor('#ff4d6d');

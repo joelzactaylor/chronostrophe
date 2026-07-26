@@ -15,7 +15,6 @@ function buildMyLevel(): LevelDef {
 
   return {
     name: 'My Level',
-    brief: 'One line, shown in the HUD and the menu.',
     map: new TileMap(grid.map((r) => r.join(''))),
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },   // feet on row 15
     boxes: [],

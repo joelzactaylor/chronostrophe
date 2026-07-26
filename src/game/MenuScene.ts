@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { LEVELS, buildLevel } from './level';
 import { VIEW_H, VIEW_W } from './GameScene';
 
-const ROW_H = 54;
+const ROW_H = 42;
 const TOP = 150;
 const LEFT = 120;
 const WIDTH = VIEW_W - 240;
@@ -32,7 +32,7 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.add
-      .text(VIEW_W / 2, 104, 'select a level  ·  ↑/↓ and ENTER, a number key, or click', {
+      .text(VIEW_W / 2, 104, 'select a level', {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#8892bd',
@@ -41,7 +41,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.rows = LEVELS.map((_, i) => {
       const level = buildLevel(i);
-      return this.add.text(LEFT + 20, TOP + i * ROW_H + 10, `${i + 1}. ${level.name.toUpperCase()}\n   ${level.brief}`, {
+      return this.add.text(LEFT + 20, TOP + i * ROW_H + 8, `${i + 1}. ${level.name.toUpperCase()}`, {
         fontFamily: 'monospace',
         fontSize: '15px',
         color: '#cfd8ff',
@@ -96,7 +96,7 @@ export class MenuScene extends Phaser.Scene {
       this.rows[i].setColor(on ? '#ffffff' : '#cfd8ff');
       if (on) {
         const pulse = 0.5 + 0.5 * Math.sin(time / 260);
-        g.fillStyle(0xf7e26b, 0.4 + 0.5 * pulse).fillRect(LEFT + 4, y + 6, 4, ROW_H - 20);
+        g.fillStyle(0xf7e26b, 0.4 + 0.5 * pulse).fillRect(LEFT + 4, y + 6, 4, ROW_H - 18);
       }
     });
 
