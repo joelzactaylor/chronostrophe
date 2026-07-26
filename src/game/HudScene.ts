@@ -7,13 +7,15 @@ const TRACK_W = VIEW_W - 200;
 const TRACK_Y = VIEW_H + 58;
 const PANEL_H = 96;
 
+type Button = { x: number; y: number; w: number; h: number };
+
 /** "Give up on this run": the way out of a level that has walled itself off. */
-const ABANDON: { x: number; y: number; w: number; h: number } = {
-  x: VIEW_W - 132,
-  y: VIEW_H + 8,
-  w: 116,
-  h: 24,
-};
+const ABANDON: Button = { x: VIEW_W - 132, y: VIEW_H + 8, w: 116, h: 24 };
+const MENU: Button = { x: VIEW_W - 226, y: VIEW_H + 8, w: 86, h: 24 };
+
+function hit(b: Button, p: Phaser.Input.Pointer): boolean {
+  return p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h;
+}
 
 export class HudScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
@@ -23,6 +25,7 @@ export class HudScene extends Phaser.Scene {
   private banner!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
   private abandon!: Phaser.GameObjects.Text;
+  private menu!: Phaser.GameObjects.Text;
   private dragging = false;
 
   constructor() {
@@ -64,9 +67,21 @@ export class HudScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    this.menu = this.add
+      .text(MENU.x + MENU.w / 2, MENU.y + MENU.h / 2, 'LEVELS', {
+        ...font,
+        fontSize: '12px',
+        color: '#b9c3ea',
+      })
+      .setOrigin(0.5);
+
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (this.hitAbandon(p)) {
+      if (hit(ABANDON, p)) {
         this.game_.abandonRun();
+        return;
+      }
+      if (hit(MENU, p)) {
+        this.game_.openMenu();
         return;
       }
       if (this.hitTrack(p)) {
@@ -79,12 +94,6 @@ export class HudScene extends Phaser.Scene {
       else if (!p.isDown) this.dragging = false;
     });
     this.input.on('pointerup', () => (this.dragging = false));
-  }
-
-  private hitAbandon(p: Phaser.Input.Pointer): boolean {
-    return (
-      p.x > ABANDON.x && p.x < ABANDON.x + ABANDON.w && p.y > ABANDON.y && p.y < ABANDON.y + ABANDON.h
-    );
   }
 
   private hitTrack(p: Phaser.Input.Pointer): boolean {
@@ -108,10 +117,16 @@ export class HudScene extends Phaser.Scene {
     g.fillStyle(0x080512, 1).fillRect(0, VIEW_H, VIEW_W, PANEL_H);
     g.fillStyle(0x6d4bd6, 0.6).fillRect(0, VIEW_H, VIEW_W, 2);
 
-    const overButton = this.hitAbandon(this.input.activePointer);
-    g.fillStyle(0xf43f5e, overButton ? 0.28 : 0.14).fillRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
-    g.lineStyle(1, 0xf43f5e, overButton ? 0.9 : 0.55).strokeRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
-    this.abandon.setColor(overButton ? '#ffffff' : '#ffb3c1');
+    const p = this.input.activePointer;
+    const overAbandon = hit(ABANDON, p);
+    g.fillStyle(0xf43f5e, overAbandon ? 0.28 : 0.14).fillRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
+    g.lineStyle(1, 0xf43f5e, overAbandon ? 0.9 : 0.55).strokeRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
+    this.abandon.setColor(overAbandon ? '#ffffff' : '#ffb3c1');
+
+    const overMenu = hit(MENU, p);
+    g.fillStyle(0x6d4bd6, overMenu ? 0.3 : 0.14).fillRect(MENU.x, MENU.y, MENU.w, MENU.h);
+    g.lineStyle(1, 0x6d4bd6, overMenu ? 0.9 : 0.55).strokeRect(MENU.x, MENU.y, MENU.w, MENU.h);
+    this.menu.setColor(overMenu ? '#ffffff' : '#b9c3ea');
 
     // recorded history coverage
     for (const run of w.runs) {

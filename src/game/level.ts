@@ -128,7 +128,9 @@ function buildBallast(): LevelDef {
     brief: 'The crate is the step. Get it through.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [{ x: 20 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(24, 240)],
+    // Clear of the pad on the far side: the pad has to be reachable without
+    // shoving the crate first.
+    boxes: [{ x: 21 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(24, 240)],
     devices: [pad('chronoporter', 19, 15, PORTER_LABEL)],
     hazards: [],
     exit: { x: 32.5 * TILE, y: 12 * TILE - 26, r: 22 },

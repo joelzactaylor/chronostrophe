@@ -19,6 +19,7 @@ npm run build      # production bundle in dist/
 | jump | `W` / `↑` / `Space` |
 | duck | `S` / `↓` |
 | abandon the run (when a level has walled itself off) | `K`, or the ABANDON RUN button |
+| level select | `ESC`, or the LEVELS button |
 | reverse time (on an anachroverter) | `R` |
 | scrub time (on a time device) | drag the slider under the viewport |
 
@@ -49,7 +50,8 @@ npm run build      # production bundle in dist/
 | 4 | Cascade | Three stones down a long run, each one let go too early to be beaten from where the last one left you. Every pocket between them has its own pad: reach it, put the world back to the start, walk on. The gate is up on a shelf at the end, so the last pocket has to be left with the crate. |
 | 5 | Lift | The introduction to the anachroverter. The gate is high up beside the place a stone hangs, and there is no way up until the stone comes down. Reverse time on the pad, climb the crate onto the resting stone, and ride it back up its own fall to the gate. |
 
-Reaching a gate advances to the next level with `ENTER`.
+Reaching a gate advances to the next level with `ENTER`. Every level is unlocked from the start:
+the menu is the first thing the game shows, and `ESC` returns to it.
 
 ## Devices
 

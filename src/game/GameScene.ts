@@ -102,13 +102,14 @@ export class GameScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys(
-      'LEFT,RIGHT,UP,DOWN,A,D,W,S,SPACE,R,K,ENTER',
+      'LEFT,RIGHT,UP,DOWN,A,D,W,S,SPACE,R,K,ESC,ENTER',
     ) as Record<string, Phaser.Input.Keyboard.Key>;
     kb.on('keydown-SPACE', () => (this.jumpQueued = true));
     kb.on('keydown-UP', () => (this.jumpQueued = true));
     kb.on('keydown-W', () => (this.jumpQueued = true));
     kb.on('keydown-R', () => this.onReversePressed());
     kb.on('keydown-K', () => this.abandonRun());
+    kb.on('keydown-ESC', () => this.openMenu());
     kb.on('keydown-ENTER', () => {
       if (this.state !== 'won') return;
       this.scene.restart({ level: this.hasNextLevel ? this.levelIndex + 1 : 0 });
@@ -146,6 +147,11 @@ export class GameScene extends Phaser.Scene {
     if (this.activeDevice?.kind !== 'anachroverter') return;
     this.world.dir = this.world.dir === 1 ? -1 : 1;
     this.message = `TIME DIRECTION: ${this.world.dir === 1 ? 'FORWARD' : 'BACKWARD'}`;
+  }
+
+  openMenu(): void {
+    this.scene.stop('hud');
+    this.scene.start('menu');
   }
 
   /**

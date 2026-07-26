@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameScene, VIEW_H, VIEW_W } from './game/GameScene';
 import { HudScene } from './game/HudScene';
+import { MenuScene } from './game/MenuScene';
 
 const HUD_H = 96;
 
@@ -16,7 +17,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [GameScene, HudScene],
+  scene: [MenuScene, GameScene, HudScene],
 });
 
 if (import.meta.env.DEV) {
