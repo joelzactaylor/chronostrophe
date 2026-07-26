@@ -57,6 +57,8 @@ export interface MoveResult {
   hit: boolean;
   /** id of the solid that stopped the motion, if any */
   hitId: number;
+  /** Largest distance a single overlap had to be undone by. */
+  correction: number;
 }
 
 const scratch: Rect[] = [];
@@ -64,11 +66,13 @@ const scratch: Rect[] = [];
 /** Moves rect horizontally, clamping against tiles and solids. Mutates rect.x. */
 export function moveX(rect: Rect, dx: number, map: TileMap, solids: SolidRect[]): MoveResult {
   rect.x += dx;
-  const res: MoveResult = { hit: false, hitId: GROUND_NONE };
+  const res: MoveResult = { hit: false, hitId: GROUND_NONE, correction: 0 };
   if (dx === 0) return res;
   const resolve = (other: Rect, id: number) => {
     if (!rectsOverlap(rect, other)) return;
+    const from = rect.x;
     rect.x = dx > 0 ? other.x - rect.w - EPS : other.x + other.w + EPS;
+    res.correction = Math.max(res.correction, Math.abs(rect.x - from));
     res.hit = true;
     res.hitId = id;
   };
@@ -85,9 +89,16 @@ export interface VerticalResult extends MoveResult {
 /** Moves rect vertically, clamping against tiles and solids. Mutates rect.y. */
 export function moveY(rect: Rect, dy: number, map: TileMap, solids: SolidRect[]): VerticalResult {
   rect.y += dy;
-  const res: VerticalResult = { hit: false, hitId: GROUND_NONE, groundedOn: GROUND_NONE, ceiling: false };
+  const res: VerticalResult = {
+    hit: false,
+    hitId: GROUND_NONE,
+    correction: 0,
+    groundedOn: GROUND_NONE,
+    ceiling: false,
+  };
   const resolve = (other: Rect, id: number) => {
     if (!rectsOverlap(rect, other)) return;
+    const from = rect.y;
     if (dy > 0) {
       rect.y = other.y - rect.h;
       res.groundedOn = id;
@@ -95,6 +106,7 @@ export function moveY(rect: Rect, dy: number, map: TileMap, solids: SolidRect[])
       rect.y = other.y + other.h;
       res.ceiling = true;
     }
+    res.correction = Math.max(res.correction, Math.abs(rect.y - from));
     res.hit = true;
     res.hitId = id;
   };

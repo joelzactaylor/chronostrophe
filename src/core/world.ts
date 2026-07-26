@@ -96,6 +96,11 @@ export class World {
   now = 0;
   dir: 1 | -1 = 1;
   paused = false;
+  /**
+   * Set when resolving the live body took more than its own width to undo, which
+   * means it was inside something rather than running into it — it was crushed.
+   */
+  crushed = false;
 
   private nextRunId = 0;
   private coyote = 0;
@@ -323,6 +328,7 @@ export class World {
 
   private stepPlayer(input: Input): void {
     const p = this.player;
+    this.crushed = false;
     const solids = this.solids();
     const wantDuck = input.down && p.groundedOn !== GROUND_NONE;
     if (!wantDuck && p.ducking) {
@@ -374,6 +380,7 @@ export class World {
     const hy = moveY(rect, p.vy * DT, this.map, this.solids());
     if (hy.groundedOn !== GROUND_NONE) p.vy = 0;
     if (hy.ceiling) p.vy = 0;
+    if (Math.max(hx.correction, hy.correction) > PLAYER_W) this.crushed = true;
     p.x = rect.x;
     p.y = rect.y;
     p.groundedOn = hy.groundedOn !== GROUND_NONE ? hy.groundedOn : supportUnder(rect, this.map, this.solids());
