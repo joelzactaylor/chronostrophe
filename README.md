@@ -43,7 +43,10 @@ npm run build      # production bundle in dist/
 | # | level | the idea |
 | --- | --- | --- |
 | 1 | Threshold | A flat sprint for the gate. 2.5 s in, a suspended monolith is let go and walls off the run. The chronoporter sits on the near side: scrub the world back to before the stone fell, then walk under the space it is going to occupy. |
-| 2 | Fallback | Push the crate off the upper shelf, dive after it, stand on the anachroverter and reverse time, then ride the crate back up its own fall to the exit shelf. |
+| 2 | Interval | Two stones on the same run, let go at different moments. Sprint past the near one inside its window to reach the pad in the middle, then scrub back to walk through the far corridor, which is already sealed in the present. |
+| 3 | Sealed | The stone comes down on the gate itself. In the present the way out is buried; from the pad the gate is a second's walk away in the past. |
+| 4 | Cascade | Three stones down a long run, each one let go too early to be beaten from where the last one left you. Every pocket between them has its own pad: reach it, put the world back to the start, walk on. |
+| 5 | Fallback | Push the crate off the upper shelf, dive after it, stand on the anachroverter and reverse time, then ride the crate back up its own fall to the exit shelf. |
 
 Reaching a gate advances to the next level with `ENTER`.
 

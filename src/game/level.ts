@@ -78,6 +78,83 @@ function buildThreshold(): LevelDef {
   };
 }
 
+/** A screen-wide floor with walls at both ends: the shape every chronoporter level uses. */
+function corridorGrid(): string[][] {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, ROWS - 1);
+  fill(grid, 0, 0, 0, 14);
+  fill(grid, COLS - 1, 0, COLS - 1, 14);
+  return grid;
+}
+
+/** A 4x3 stone suspended overhead, let go at `releaseTick`. */
+function monolith(cx: number, releaseTick: number): BoxSpec {
+  return { x: cx * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick };
+}
+
+const PORTER_LABEL = 'CHRONOPORTER — drag the slider';
+
+/**
+ * "Interval" — two stones on the same run, let go at different times. The near one
+ * gives a two-and-a-half second window to sprint past it and reach the pad in the
+ * middle; the far one is already down by the time anyone gets there. From the pad
+ * the far corridor is close enough to walk through in the past.
+ */
+function buildInterval(): LevelDef {
+  const map = new TileMap(corridorGrid().map((r) => r.join('')));
+  return {
+    name: 'Interval',
+    brief: 'Two stones, two different moments.',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [monolith(12, 150), monolith(24, 180)],
+    devices: [pad('chronoporter', 17, 15, PORTER_LABEL)],
+    hazards: [],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
+/**
+ * "Sealed" — the stone comes down on the gate itself. Walking up to it in the
+ * present finds the way out buried; the pad is close enough that from an early
+ * tick the gate can be reached in the second before it is sealed.
+ */
+function buildSealed(): LevelDef {
+  const map = new TileMap(corridorGrid().map((r) => r.join('')));
+  return {
+    name: 'Sealed',
+    brief: 'The gate does not stay open.',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [monolith(38, 90)],
+    devices: [pad('chronoporter', 33, 15, PORTER_LABEL)],
+    hazards: [],
+    exit: { x: 40 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
+/**
+ * "Cascade" — three stones spread down a long run, each one let go too early to be
+ * beaten from where the last one left you. Every pocket between them holds its own
+ * pad: reach it, put the world back to the start, and the next corridor is walkable.
+ */
+function buildCascade(): LevelDef {
+  const map = new TileMap(corridorGrid().map((r) => r.join('')));
+  return {
+    name: 'Cascade',
+    brief: 'Three stones. One pocket at a time.',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [monolith(10, 150), monolith(20, 160), monolith(30, 120)],
+    devices: [
+      pad('chronoporter', 16, 15, PORTER_LABEL),
+      pad('chronoporter', 26, 15, PORTER_LABEL),
+    ],
+    hazards: [],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 /**
  * "Fallback" — push the crate off the upper shelf, dive after it, then reverse
  * time and ride its rewinding worldline back up to the exit shelf.
@@ -115,7 +192,13 @@ function buildFallback(): LevelDef {
   };
 }
 
-export const LEVELS: (() => LevelDef)[] = [buildThreshold, buildFallback];
+export const LEVELS: (() => LevelDef)[] = [
+  buildThreshold,
+  buildInterval,
+  buildSealed,
+  buildCascade,
+  buildFallback,
+];
 
 export function buildLevel(index = 0): LevelDef {
   return LEVELS[clamp(Math.round(index), 0, LEVELS.length - 1)]();

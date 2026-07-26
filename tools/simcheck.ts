@@ -18,9 +18,11 @@ function check(name: string, ok: boolean, detail = ''): void {
   }
 }
 
-/** Level 2, "Fallback": the crate/reverse-time level most of these checks exercise. */
+/** Index of "Fallback", the crate/reverse-time level most of these checks exercise. */
+const FALLBACK = 4;
+
 function makeWorld(): World {
-  return makeLevel(1);
+  return makeLevel(FALLBACK);
 }
 
 function makeLevel(index: number): World {
@@ -253,9 +255,89 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   check('the falling monolith crushes the player', crushed, `t=${w.now}`);
 }
 
-// 12. Level 2 is completable with the intended solution.
+// 12. The chronoporter levels: each pad in turn, scrub to the start, walk on.
 {
-  const level = buildLevel(1);
+  /**
+   * Plays a chronoporter level the intended way: walk right, and on reaching each
+   * pad in turn put the world back to `RESET_TICK` before carrying on. Reports the
+   * tick each pad was reached at so the sprint windows can be checked.
+   */
+  const RESET_TICK = 5;
+  function playPorterLevel(index: number): {
+    won: boolean;
+    crushed: boolean;
+    padTicks: number[];
+    now: number;
+    x: number;
+  } {
+    const level = buildLevel(index);
+    const w = new World(level.map, level.spawn, level.boxes);
+    const pads = level.devices.map((d) => d.rect.x);
+    const padTicks: number[] = [];
+    let next = 0;
+    let won = false;
+    let crushed = false;
+
+    for (let i = 0; i < 1200 && !won && !crushed; i++) {
+      w.step({ ...NO_INPUT, right: true });
+      crushed = w.crushed;
+      if (next < pads.length && w.player.x >= pads[next]) {
+        padTicks.push(w.now);
+        next++;
+        w.splitRun();
+        w.scrubTo(RESET_TICK);
+      }
+      const pr = playerRect(w.player);
+      won =
+        pr.x < level.exit.x + level.exit.r &&
+        pr.x + pr.w > level.exit.x - level.exit.r &&
+        pr.y < level.exit.y + level.exit.r &&
+        pr.y + pr.h > level.exit.y - level.exit.r;
+      if (w.atTimeBound()) break;
+    }
+    return { won, crushed, padTicks, now: w.now, x: w.player.x };
+  }
+
+  /** Walking straight at the level, with no use of the pad, gets stopped. */
+  function sprintOnly(index: number): { won: boolean; x: number } {
+    const level = buildLevel(index);
+    const w = new World(level.map, level.spawn, level.boxes);
+    let won = false;
+    for (let i = 0; i < 900 && !won; i++) {
+      w.step({ ...NO_INPUT, right: true, jump: true, jumpPressed: i % 20 === 0 });
+      const pr = playerRect(w.player);
+      won = pr.x + pr.w > level.exit.x - level.exit.r && pr.x < level.exit.x + level.exit.r;
+      if (w.atTimeBound()) break;
+    }
+    return { won, x: w.player.x };
+  }
+
+  // Per level: its index, and the tick of the stone the first pad has to be reached
+  // ahead of, where the level opens with a sprint.
+  for (const [index, dash] of [
+    [1, 150],
+    [2, null],
+    [3, 150],
+  ] as [number, number | null][]) {
+    const level = buildLevel(index);
+    const r = playPorterLevel(index);
+    check(`"${level.name}" is completable with the chronoporter alone`, r.won, `t=${r.now} x=${r.x} pads=${r.padTicks}`);
+    check(`"${level.name}" does not crush the player on the intended route`, !r.crushed);
+    check(`"${level.name}" uses every pad in the level`, r.padTicks.length === level.devices.length, `${r.padTicks}`);
+    check(`"${level.name}" cannot be beaten by running straight at it`, !sprintOnly(index).won, `x=${sprintOnly(index).x}`);
+    if (dash !== null) {
+      check(
+        `"${level.name}" first pad is reached before its stone comes down`,
+        r.padTicks[0] < dash,
+        `pad at t=${r.padTicks[0]}, stone at ${dash}`,
+      );
+    }
+  }
+}
+
+// 13. Level "Fallback" is completable with the intended solution.
+{
+  const level = buildLevel(FALLBACK);
   const w = new World(level.map, level.spawn, level.boxes);
   const box = w.boxes[0];
   const exit = level.exit;
