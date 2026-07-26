@@ -127,8 +127,9 @@ export class HudScene extends Phaser.Scene {
     this.dirText.setText(w.paused ? 'PAUSED' : w.dir === 1 ? 'FORWARD' : 'REVERSE');
     this.dirText.setColor(w.paused ? '#8892bd' : w.dir === 1 ? '#76d9ff' : '#f7a1ff');
     const ghosts = w.ghostsAt(w.now).length;
+    const level = `${scene.levelIndex + 1}. ${scene.level.name.toUpperCase()}`;
     this.status.setText(
-      `${scene.message}    ·    ghosts:${ghosts}  runs:${w.runs.length}` +
+      `${level}    ·    ${scene.message || scene.level.brief}    ·    ghosts:${ghosts}  runs:${w.runs.length}` +
         (scene.canScrub() ? '    ·    drag the slider' : ''),
     );
 
@@ -141,7 +142,11 @@ export class HudScene extends Phaser.Scene {
       case 'won':
         g.fillStyle(0x05030a, 0.72).fillRect(0, 0, VIEW_W, VIEW_H);
         this.banner.setText('TIMELINE RESOLVED').setColor('#f7e26b');
-        this.hint.setText('You slipped through the singularity gate.\n[ENTER] play again');
+        this.hint.setText(
+          scene.hasNextLevel
+            ? 'You slipped through the singularity gate.\n[ENTER] next level'
+            : 'You slipped through the singularity gate.\n[ENTER] play again',
+        );
         break;
       case 'dust':
         this.banner.setText('THE UNIVERSE ENDS').setColor('#d6b3ff');

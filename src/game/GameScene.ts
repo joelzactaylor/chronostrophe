@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PlayerState, Rect, TICKS, TILE, clamp, rectsOverlap } from '../core/types';
 import { Box, Input, World, boxRect, playerRect } from '../core/world';
-import { Device, LevelDef, buildLevel } from './level';
+import { Device, LEVELS, LevelDef, buildLevel } from './level';
 import { FISHEYE_KEY, FisheyePipeline } from './fisheye';
 
 export type GameState = 'play' | 'death' | 'dust' | 'fisheye' | 'won';
@@ -45,6 +45,10 @@ export class GameScene extends Phaser.Scene {
   activeDevice: Device | null = null;
   singularities: Singularity[] = [];
   lastParadoxReason = '';
+  levelIndex = 0;
+  get hasNextLevel(): boolean {
+    return this.levelIndex + 1 < LEVELS.length;
+  }
 
   private gfx!: Phaser.GameObjects.Graphics;
   private bg!: Phaser.GameObjects.Graphics;
@@ -61,8 +65,12 @@ export class GameScene extends Phaser.Scene {
     super('game');
   }
 
+  init(data: { level?: number }): void {
+    if (typeof data.level === 'number') this.levelIndex = data.level;
+  }
+
   create(): void {
-    this.level = buildLevel();
+    this.level = buildLevel(this.levelIndex);
     this.world = new World(this.level.map, this.level.spawn, this.level.boxes);
     this.state = 'play';
     this.message = '';
@@ -101,7 +109,8 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-W', () => (this.jumpQueued = true));
     kb.on('keydown-R', () => this.onReversePressed());
     kb.on('keydown-ENTER', () => {
-      if (this.state === 'won') this.scene.restart();
+      if (this.state !== 'won') return;
+      this.scene.restart({ level: this.hasNextLevel ? this.levelIndex + 1 : 0 });
     });
 
     if (!this.scene.isActive('hud')) this.scene.launch('hud');
@@ -362,7 +371,7 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.setAlpha(clamp(1 - this.effectT / 2200, 0, 1));
     }
     if (this.state !== 'won' && this.effectT > (this.state === 'death' ? 1100 : 2100)) {
-      this.scene.restart();
+      this.scene.restart({ level: this.levelIndex });
     }
   }
 
@@ -440,7 +449,26 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0x05030a, 1).fillCircle(e.x, e.y, e.r * 0.72);
   }
 
+  /** Stone that history hangs on: suspended until its tick, then immovable. */
+  private drawMonolith(g: Phaser.GameObjects.Graphics, box: Box): void {
+    const r = boxRect(box);
+    const held = this.world.now < box.releaseTick;
+    if (held) {
+      const t = this.time.now / 220;
+      g.lineStyle(1, COL_SINGULARITY, 0.35 + 0.2 * Math.sin(t));
+      for (let x = r.x + 8; x < r.x + r.w; x += 24) g.lineBetween(x, r.y + r.h, x, r.y + r.h + 520);
+    }
+    g.fillStyle(0x151226, 1).fillRect(r.x, r.y, r.w, r.h);
+    g.fillStyle(held ? 0x3a3550 : 0x4a4466, 1).fillRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
+    g.lineStyle(2, 0x6d4bd6, held ? 0.5 : 0.85).strokeRect(r.x, r.y, r.w, r.h);
+    g.lineStyle(1, 0x241a44, 0.9);
+    g.lineBetween(r.x + r.w * 0.3, r.y + 4, r.x + r.w * 0.45, r.y + r.h - 4);
+    g.lineBetween(r.x + r.w * 0.7, r.y + 4, r.x + r.w * 0.58, r.y + r.h - 4);
+    g.lineBetween(r.x + 4, r.y + r.h * 0.55, r.x + r.w - 4, r.y + r.h * 0.42);
+  }
+
   private drawBox(g: Phaser.GameObjects.Graphics, box: Box): void {
+    if (box.immovable) return this.drawMonolith(g, box);
     const r = boxRect(box);
     const rewinding = this.world.dir === -1 && !this.world.paused;
     g.fillStyle(0x7a4a1e, 1).fillRect(r.x, r.y, r.w, r.h);
