@@ -30,6 +30,13 @@ export const BOX_PUSH_SPEED = 130;
 /** Separation kept between a shoved object and the body that shoved it. */
 const EPS = 0.02;
 
+/**
+ * How far below a recorded body its support may sit and still hold it up. A crate
+ * carrying a ghost down a fall trails it by up to a tick of travel, so the probe is
+ * deliberately generous: only a body with nothing beneath it is standing on nothing.
+ */
+const GHOST_SUPPORT_PROBE = 24;
+
 export interface Input {
   left: boolean;
   right: boolean;
@@ -140,9 +147,10 @@ export class World {
   }
 
   /**
-   * Recorded bodies as solids. Ghosts are transparent to the live player but the
-   * rest of the world is not exempt from them: crates rest on them and are shoved
-   * by them, exactly as they were by the run that recorded the body.
+   * Recorded bodies as solids for objects only. Ghosts are transparent to the live
+   * player and to each other — two former selves occupy the same space without
+   * interfering — but crates rest on them and are shoved by them, exactly as they
+   * were by the run that recorded the body.
    */
   ghostSolidsAt(t: number): SolidRect[] {
     return this.ghostsAt(t).map(({ state }) => {
@@ -223,9 +231,11 @@ export class World {
   /**
    * Applies the motion of every recorded body to the objects it touches on the
    * way from `now` to `target`: a crate standing on a ghost travels with it, and
-   * a crate in the way of one gets shoved aside.
+   * a crate in the way of one gets shoved aside. At most one recorded body acts on
+   * a given object per tick, so overlapping ghosts never fight over a crate.
    */
   private applyGhostMotion(target: number): void {
+    const claimed = new Set<number>();
     for (const run of this.runs) {
       const prev = run.states[this.now];
       const next = run.states[target];
@@ -236,6 +246,7 @@ export class World {
       const dy = nr.y - pr.y;
       if (dx === 0 && dy === 0) continue;
       for (const box of this.boxes) {
+        if (claimed.has(box.id)) continue;
         const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         const others = this.otherBoxSolids(box);
         const riding =
@@ -243,12 +254,15 @@ export class World {
         if (riding) {
           moveX(rect, dx, this.map, others);
           moveY(rect, dy, this.map, others);
+          claimed.add(box.id);
         } else if (rectsOverlap(nr, rect)) {
           if (dx !== 0) {
             const out = dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w);
             moveX(rect, out, this.map, others);
+            claimed.add(box.id);
           } else if (dy < 0) {
             moveY(rect, nr.y - EPS - (rect.y + rect.h), this.map, others);
+            claimed.add(box.id);
           }
         }
         box.state.x = rect.x;
@@ -359,10 +373,14 @@ export class World {
     for (const { run, state } of this.ghostsAt(this.now)) {
       const g = playerRect(state);
 
-      // A recorded body stood on something that is no longer there. It cannot be
-      // standing on air, so the history that put it there is void.
-      if (state.groundedOn !== GROUND_NONE && supportUnder(g, this.map, this.solids()) === GROUND_NONE) {
-        return { run, tick: this.now, reason: 'a former self is standing on nothing', x: g.x, y: g.y };
+      // A recorded body stood on a crate that is no longer under it. It cannot be
+      // standing on air, so the history that put it there is void. Tile support is
+      // never in question: level geometry does not move.
+      if (state.groundedOn >= 0) {
+        const support = this.boxes[state.groundedOn];
+        if (support && !this.holdsUp(support, g)) {
+          return { run, tick: this.now, reason: 'a former self is standing on nothing', x: g.x, y: g.y };
+        }
       }
 
       for (const box of this.boxes) {
@@ -375,6 +393,12 @@ export class World {
       }
     }
     return null;
+  }
+
+  /** True when the box is still beneath the rect, close enough to be holding it up. */
+  private holdsUp(box: Box, r: Rect): boolean {
+    const probe: Rect = { x: r.x, y: r.y + r.h - 2, w: r.w, h: GHOST_SUPPORT_PROBE + 2 };
+    return rectsOverlap(probe, boxRect(box));
   }
 
   respawnPlayerAtSpawn(): void {

@@ -157,7 +157,45 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   check('the contradicted run is removed from history', w.runs.length === 0 && w.detectParadox() === null);
 }
 
-// 9. The level is completable with the intended solution.
+// 9. Overlapping ghosts do not collide with each other, and do not double-shove a crate.
+{
+  const single = makeWorld();
+  const box = single.boxes[0];
+  single.player.x = box.state.x - 21;
+  single.player.y = 9 * TILE - 28;
+  run(single, 90, { ...NO_INPUT, right: true });
+  single.splitRun();
+  const twin = { ...single.runs[0], id: 99 };
+  single.scrubTo(0);
+  single.player.x = 100;
+  single.player.y = 15 * TILE - 28;
+  run(single, 90);
+  const oneGhost = box.state.x;
+
+  const pair = makeWorld();
+  const pairBox = pair.boxes[0];
+  pair.player.x = pairBox.state.x - 21;
+  pair.player.y = 9 * TILE - 28;
+  run(pair, 90, { ...NO_INPUT, right: true });
+  pair.splitRun();
+  pair.runs.push({ ...pair.runs[0], id: twin.id });
+  pair.scrubTo(0);
+  pair.player.x = 100;
+  pair.player.y = 15 * TILE - 28;
+  let paradox = null;
+  for (let i = 0; i < 90; i++) {
+    pair.step(NO_INPUT);
+    paradox = paradox ?? pair.detectParadox();
+  }
+  check('two ghosts in the same space do not contradict each other', paradox === null, `${paradox?.reason}`);
+  check(
+    'overlapping ghosts move a crate once, not twice',
+    Math.abs(pairBox.state.x - oneGhost) < 2,
+    `pair=${pairBox.state.x} single=${oneGhost}`,
+  );
+}
+
+// 10. The level is completable with the intended solution.
 {
   const level = buildLevel();
   const w = new World(level.map, level.spawn, level.boxes);
