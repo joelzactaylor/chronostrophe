@@ -248,7 +248,7 @@ export class GameScene extends Phaser.Scene {
       if (paradox) {
         this.paradoxGrace = PARADOX_GRACE;
         this.lastParadoxReason = paradox.reason;
-        this.spawnAnomaly(paradox.run.id);
+        this.spawnAnomaly(paradox.run.id, paradox.tick);
         world.removeRun(paradox.run);
         this.message = `PARADOX — ${paradox.reason.toUpperCase()}`;
       }
@@ -322,10 +322,15 @@ export class GameScene extends Phaser.Scene {
     this.livedPath.push({ ...p, tick: this.world.now, runId: this.world.current.id });
   }
 
-  /** The anomaly starts where the run it came from started, and gains on you from there. */
-  private spawnAnomaly(runId: number): void {
-    const from = this.livedPath.findIndex((s) => s.runId === runId);
-    this.anomalies.push({ idx: from < 0 ? 0 : from, born: this.time.now });
+  /**
+   * The anomaly sets off from the moment the physics went invalid — the lived step
+   * at which the contradicted run occupied the contradicted tick — and gains on the
+   * present from there.
+   */
+  private spawnAnomaly(runId: number, tick: number): void {
+    const at = this.livedPath.findIndex((s) => s.runId === runId && s.tick === tick);
+    const fallback = this.livedPath.findIndex((s) => s.runId === runId);
+    this.anomalies.push({ idx: Math.max(0, at >= 0 ? at : fallback), born: this.time.now });
   }
 
   private advanceAnomalies(): void {
