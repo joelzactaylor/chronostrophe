@@ -1,5 +1,5 @@
 import { TileMap } from '../core/physics';
-import { BoxSpec } from '../core/world';
+import { BoxSpec, PLAYER_H, PLAYER_W } from '../core/world';
 import { Rect, TILE, clamp } from '../core/types';
 
 export type DeviceKind = 'chronoporter' | 'anachroverter' | 'chronoclast';
@@ -34,10 +34,18 @@ function fill(grid: string[][], x0: number, y0: number, x1: number, y1: number):
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = '#';
 }
 
+/**
+ * A device occupies a volume the player fits inside, one tile wide with the same
+ * clearance over the body's head as it has either side of it. Objects cannot enter
+ * it, so nothing ever settles in the space the player has to stand in.
+ */
+const PAD_MARGIN = (TILE - PLAYER_W) / 2;
+
 function pad(kind: DeviceKind, cx: number, surfaceRow: number, label: string): Device {
+  const h = PLAYER_H + PAD_MARGIN;
   return {
     kind,
-    rect: { x: cx * TILE, y: surfaceRow * TILE - 10, w: TILE, h: 10 },
+    rect: { x: cx * TILE, y: surfaceRow * TILE - h, w: TILE, h },
     label,
   };
 }

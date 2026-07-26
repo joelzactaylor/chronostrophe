@@ -7,6 +7,8 @@ export const TICKS = 3600;
 export const GROUND_NONE = -2;
 export const GROUND_TILE = -1;
 export const GROUND_GHOST = -3;
+/** A time device's volume: solid to objects, open to the live body. */
+export const DEVICE_SOLID = -4;
 
 export interface Rect {
   x: number;

@@ -71,7 +71,12 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.level = buildLevel(this.levelIndex);
-    this.world = new World(this.level.map, this.level.spawn, this.level.boxes);
+    this.world = new World(
+      this.level.map,
+      this.level.spawn,
+      this.level.boxes,
+      this.level.devices.map((d) => d.rect),
+    );
     this.state = 'play';
     this.message = '';
     this.singularities = [];
@@ -541,11 +546,15 @@ export class GameScene extends Phaser.Scene {
       const r = d.rect;
       const color =
         d.kind === 'chronoporter' ? 0x38bdf8 : d.kind === 'anachroverter' ? 0xa855f7 : 0xf43f5e;
-      g.fillStyle(0x120c26, 1).fillRect(r.x, r.y, r.w, r.h);
-      g.fillStyle(color, 1).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
       const pulse = 0.25 + 0.2 * Math.sin(t + r.x);
-      g.fillStyle(color, pulse).fillRect(r.x - 4, r.y - 16, r.w + 8, 16);
-      g.lineStyle(1, color, 0.8).strokeRect(r.x - 4, r.y - 16, r.w + 8, r.h + 16);
+      // The volume the body stands in: a field, drawn behind the player.
+      g.fillStyle(color, 0.1 + 0.06 * pulse).fillRect(r.x, r.y, r.w, r.h);
+      g.lineStyle(1, color, 0.5).strokeRect(r.x, r.y, r.w, r.h);
+      // The plate underfoot.
+      const base = r.y + r.h - 10;
+      g.fillStyle(0x120c26, 1).fillRect(r.x, base, r.w, 10);
+      g.fillStyle(color, 1).fillRect(r.x + 2, base + 2, r.w - 4, 6);
+      g.fillStyle(color, pulse).fillRect(r.x + 4, r.y + 2, r.w - 8, 3);
     }
   }
 

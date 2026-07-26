@@ -3,7 +3,7 @@
  * scrubbing, reverse-time worldline replay and the "ride the rewinding box"
  * mechanic the level is built around. Run with `npm run check:sim`.
  */
-import { MONOLITH_RELEASE, buildLevel } from '../src/game/level';
+import { LevelDef, MONOLITH_RELEASE, buildLevel } from '../src/game/level';
 import { TileMap } from '../src/core/physics';
 import { NO_INPUT, World, playerRect } from '../src/core/world';
 import { Input } from '../src/core/world';
@@ -220,10 +220,15 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   );
 }
 
+/** A level exactly as the game builds it, pads solid to objects included. */
+function levelWorld(level: LevelDef): World {
+  return new World(level.map, level.spawn, level.boxes, level.devices.map((d) => d.rect));
+}
+
 // 10. Level 1, "Threshold": the monolith blocks the run, and scrubbing back gets you through.
 {
   const level = buildLevel(0);
-  const w = new World(level.map, level.spawn, level.boxes);
+  const w = levelWorld(level);
   const stone = w.boxes[0];
   const held = { ...stone.initial };
 
@@ -260,7 +265,7 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
 // 11. Standing where the monolith lands is fatal: the fix-up exceeds the player's own width.
 {
   const level = buildLevel(0);
-  const w = new World(level.map, level.spawn, level.boxes);
+  const w = levelWorld(level);
   const stone = w.boxes[0];
   w.player.x = stone.state.x + 40;
   run(w, MONOLITH_RELEASE - 5);
@@ -289,7 +294,7 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
     x: number;
   } {
     const level = buildLevel(index);
-    const w = new World(level.map, level.spawn, level.boxes);
+    const w = levelWorld(level);
     const pads = level.devices.map((d) => d.rect.x);
     const padTicks: number[] = [];
     let next = 0;
@@ -319,7 +324,7 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   /** Walking straight at the level, with no use of the pad, gets stopped. */
   function sprintOnly(index: number): { won: boolean; x: number } {
     const level = buildLevel(index);
-    const w = new World(level.map, level.spawn, level.boxes);
+    const w = levelWorld(level);
     let won = false;
     for (let i = 0; i < 900 && !won; i++) {
       w.step({ ...NO_INPUT, right: true, jump: true, jumpPressed: i % 20 === 0 });
@@ -340,7 +345,7 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
    */
   function playCrateLevel(index: number): { won: boolean; crushed: boolean; padTicks: number[]; now: number; x: number; y: number } {
     const level = buildLevel(index);
-    const w = new World(level.map, level.spawn, level.boxes);
+    const w = levelWorld(level);
     const pads = level.devices.map((d) => d.rect.x);
     const padTicks: number[] = [];
     let next = 0;
@@ -409,7 +414,7 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
 // time carries the rider back up its own fall to the gate.
 {
   const level = buildLevel(LIFT);
-  const w = new World(level.map, level.spawn, level.boxes);
+  const w = levelWorld(level);
   const crate = w.boxes[0];
   const stone = w.boxes[1];
   const hangingY = stone.initial.y;
@@ -476,6 +481,26 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   check('"Lift" carries the player up on the rewinding stone', rodeStone, `stone y=${stone.state.y}`);
   check('"Lift" does not crush the player on the intended route', !crushed);
   check('the crate stays clear of where the stone lands', crate.initial.x + crate.w <= stone.initial.x);
+}
+
+// 16. A time device is solid to objects: a crate shoved at a pad stops against it
+// rather than settling in the volume the player has to stand in.
+{
+  const level = buildLevel(2);
+  const w = levelWorld(level);
+  const pad = level.devices[0].rect;
+  const crate = w.boxes[0];
+  crate.state.x = pad.x - 90;
+  crate.state.y = 15 * TILE - crate.h;
+  w.player.x = crate.state.x - 24;
+  w.player.y = 15 * TILE - 28;
+  for (let i = 0; i < 240; i++) w.step({ ...NO_INPUT, right: true });
+
+  check(
+    'a crate cannot be shoved into a time device',
+    crate.state.x + crate.w <= pad.x + 1,
+    `crate x=${crate.state.x} pad x=${pad.x}`,
+  );
 }
 
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);

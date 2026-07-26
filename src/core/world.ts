@@ -1,6 +1,7 @@
 import { SolidRect, TileMap, moveX, moveY, supportUnder } from './physics';
 import {
   BoxState,
+  DEVICE_SOLID,
   DT,
   GROUND_GHOST,
   GROUND_NONE,
@@ -107,9 +108,21 @@ export class World {
   private buffered = 0;
   private spawn: { x: number; y: number };
 
-  constructor(map: TileMap, spawn: { x: number; y: number }, boxes: BoxSpec[]) {
+  /**
+   * Device pads are solid to objects but not to the live body: a crate settling
+   * inside a time device would be sitting in a volume the player has to occupy.
+   */
+  private readonly deviceSolids: SolidRect[];
+
+  constructor(
+    map: TileMap,
+    spawn: { x: number; y: number },
+    boxes: BoxSpec[],
+    devices: Rect[] = [],
+  ) {
     this.map = map;
     this.spawn = spawn;
+    this.deviceSolids = devices.map((r) => ({ ...r, id: DEVICE_SOLID }));
     boxes.forEach((b, i) => {
       const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0 };
       const record: BoxState[] = new Array(TICKS + 1);
@@ -254,7 +267,8 @@ export class World {
   private otherBoxSolids(box: Box): SolidRect[] {
     return this.boxes
       .filter((o) => o !== box)
-      .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
+      .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
+      .concat(this.deviceSolids);
   }
 
   /**

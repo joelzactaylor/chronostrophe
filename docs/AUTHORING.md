@@ -67,8 +67,10 @@ exit:    { x, y, r }                            // the gate, as a centre and a r
 ```
 
 A pad's `surfaceRow` is the row it sits *on top of*, so `pad('chronoporter', 20, 15, …)` is on the
-floor at row 15. Keep pads clear of crates: a crate resting on a pad has to be shoved off before the
-pad can be used, which is almost never what you meant.
+floor at row 15. A pad is a volume the player fits inside — one tile wide, `PLAYER_H + 6` tall — and
+it is **solid to objects but open to the live body**, so crates and stones stop against it and never
+settle in the space you have to stand in. A pad in a crate's path is therefore a wall for the crate:
+put pads where the crate does not have to travel.
 
 ## Designing with the timeline
 
