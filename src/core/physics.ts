@@ -117,6 +117,51 @@ export function moveY(rect: Rect, dy: number, map: TileMap, solids: SolidRect[])
   return res;
 }
 
+/**
+ * Pushes a rect out of anything it is already inside, by the shortest way out.
+ *
+ * An overlap that motion did not cause — a crate shoved into a standing body by a
+ * ghost, say — has no direction of travel to undo, and resolving it as part of the
+ * next move meant resolving it along that move's axis: gravity, and so always
+ * upwards, popping the body onto the crate. For two rects the shortest exit is
+ * exactly one of four displacements, so all four are tried in order of length and
+ * the first that lands clear is taken.
+ */
+export function depenetrate(rect: Rect, map: TileMap, solids: SolidRect[]): MoveResult {
+  const res: MoveResult = { hit: false, hitId: GROUND_NONE, correction: 0 };
+
+  for (let pass = 0; pass < 4; pass++) {
+    const others: SolidRect[] = map
+      .overlapping(rect, scratch)
+      .slice()
+      .map((t) => ({ ...t, id: GROUND_TILE }))
+      .concat(solids.filter((s) => rectsOverlap(rect, s)));
+    const other = others.find((o) => rectsOverlap(rect, o));
+    if (!other) break;
+
+    const exits: { dx: number; dy: number }[] = [
+      { dx: other.x - (rect.x + rect.w) - EPS, dy: 0 },
+      { dx: other.x + other.w - rect.x + EPS, dy: 0 },
+      { dx: 0, dy: other.y - (rect.y + rect.h) - EPS },
+      { dx: 0, dy: other.y + other.h - rect.y + EPS },
+    ].sort((a, b) => Math.abs(a.dx || a.dy) - Math.abs(b.dx || b.dy));
+
+    const clear = (e: { dx: number; dy: number }): boolean => {
+      const moved: Rect = { x: rect.x + e.dx, y: rect.y + e.dy, w: rect.w, h: rect.h };
+      if (map.overlapping(moved, scratch).length > 0) return false;
+      return !solids.some((s) => rectsOverlap(moved, s));
+    };
+    const exit = exits.find(clear) ?? exits[0];
+
+    rect.x += exit.dx;
+    rect.y += exit.dy;
+    res.hit = true;
+    res.hitId = other.id;
+    res.correction = Math.max(res.correction, Math.abs(exit.dx || exit.dy));
+  }
+  return res;
+}
+
 /** True when the rect is resting on a solid surface; returns the supporting id. */
 export function supportUnder(rect: Rect, map: TileMap, solids: SolidRect[]): number {
   const probe: Rect = { x: rect.x, y: rect.y + 1, w: rect.w, h: rect.h };

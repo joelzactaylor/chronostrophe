@@ -1,4 +1,4 @@
-import { SolidRect, TileMap, moveX, moveY, supportUnder } from './physics';
+import { SolidRect, TileMap, depenetrate, moveX, moveY, supportUnder } from './physics';
 import {
   BoxState,
   DEVICE_SOLID,
@@ -327,6 +327,7 @@ export class World {
       box.state.vy = Math.min(box.state.vy + GRAVITY * DT, 900);
       const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
       const others = [...this.otherBoxSolids(box), ...ghosts];
+      if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);
       if (v.groundedOn !== GROUND_NONE || v.ceiling) box.state.vy = 0;
@@ -386,6 +387,10 @@ export class World {
     p.vy = Math.min(p.vy + GRAVITY * DT, 1200);
 
     const rect = playerRect(p);
+    // Anything that moved into the body since the last tick is undone the short
+    // way out first, so the movement below is not asked to resolve it along its
+    // own axis.
+    const dp = depenetrate(rect, this.map, solids);
     const hx = moveX(rect, p.vx * DT, this.map, solids);
     if (hx.hit) {
       if (hx.hitId >= 0 && this.dir === 1) this.pushBox(this.boxes[hx.hitId], Math.sign(p.vx), rect);
@@ -394,7 +399,7 @@ export class World {
     const hy = moveY(rect, p.vy * DT, this.map, this.solids());
     if (hy.groundedOn !== GROUND_NONE) p.vy = 0;
     if (hy.ceiling) p.vy = 0;
-    if (Math.max(hx.correction, hy.correction) > PLAYER_W) this.crushed = true;
+    if (Math.max(dp.correction, hx.correction, hy.correction) > PLAYER_W) this.crushed = true;
     p.x = rect.x;
     p.y = rect.y;
     p.groundedOn = hy.groundedOn !== GROUND_NONE ? hy.groundedOn : supportUnder(rect, this.map, this.solids());

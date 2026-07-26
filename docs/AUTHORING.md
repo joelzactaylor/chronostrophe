@@ -89,6 +89,11 @@ where it was at tick 5 while you stay where you are — with a fresh clock to sp
   away is a paradox: the contradicted run turns into a singularity that hunts you.
 * Only what you have actually lived is recorded, so you can never scrub past `now` into the future.
 
+An overlap that no motion caused — a crate shoved into a standing body by a ghost — is undone by the
+shortest of the four rect exits before anything moves that tick, so bodies and crates slide apart
+sideways instead of being lifted onto each other. A fix-up larger than the player's own width is
+still a crush, and still kills.
+
 ## Verifying it
 
 `tools/simcheck.ts` drives `World` headlessly, with no Phaser and no rendering, and `npm run check`

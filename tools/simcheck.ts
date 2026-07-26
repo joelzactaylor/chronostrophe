@@ -528,5 +528,37 @@ function levelWorld(level: LevelDef): World {
   );
 }
 
+// 18. A crate pushed into a standing body is resolved the short way out: sideways.
+// The body used to be popped on top of it, because the only overlap resolution was
+// the one gravity's own move performed.
+{
+  const level = buildLevel(2);
+  const w = levelWorld(level);
+  const pad = level.devices[0].rect;
+  const crate = w.boxes[0];
+  const floorTop = 15 * TILE;
+
+  w.player.x = pad.x + 300; // clear of the pad: this is a body-versus-crate case
+  w.player.y = floorTop - 28;
+  // 6px into the body's left side, as a ghost's shove would leave it.
+  crate.state.x = w.player.x - crate.w + 6;
+  crate.state.y = floorTop - crate.h;
+
+  const before = { x: w.player.x, y: w.player.y };
+  w.step({ ...NO_INPUT });
+
+  check(
+    'a crate pushed into the body moves the body sideways, not upwards',
+    w.player.y >= floorTop - 28 - 0.5 && w.player.x > before.x,
+    `player x=${w.player.x} (was ${before.x}) y=${w.player.y}`,
+  );
+  check('being nudged aside by a crate is not a crush', !w.crushed);
+  check(
+    'the body ends up clear of the crate',
+    w.player.x >= crate.state.x + crate.w - 0.5,
+    `player x=${w.player.x} crate right=${crate.state.x + crate.w}`,
+  );
+}
+
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);
 console.log('\nall simulation checks passed');
