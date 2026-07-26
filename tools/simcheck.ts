@@ -237,7 +237,23 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   check('and the stone falls behind them', stone.state.y > held.y + 200, `y=${stone.state.y}`);
 }
 
-// 11. Level 2 is completable with the intended solution.
+// 11. Standing where the monolith lands is fatal: the fix-up exceeds the player's own width.
+{
+  const level = buildLevel(0);
+  const w = new World(level.map, level.spawn, level.boxes);
+  const stone = w.boxes[0];
+  w.player.x = stone.state.x + 40;
+  run(w, MONOLITH_RELEASE - 5);
+  check('no crush while the stone still hangs', !w.crushed);
+  let crushed = false;
+  for (let i = 0; i < 60 && !crushed; i++) {
+    w.step(NO_INPUT);
+    crushed = w.crushed;
+  }
+  check('the falling monolith crushes the player', crushed, `t=${w.now}`);
+}
+
+// 12. Level 2 is completable with the intended solution.
 {
   const level = buildLevel(1);
   const w = new World(level.map, level.spawn, level.boxes);
