@@ -34,8 +34,8 @@ npm run build      # production bundle in dist/
   marked with a glow and a pip.
 * **Reverse time replays worldlines.** A rewinding box does not get a fresh backward force
   simulation — it retraces its recorded path frame by frame, while remaining a real collider. That
-  is what makes the level's core trick work: push a crate off a shelf, dive after it, reverse time,
-  and ride the crate back up its own fall.
+  is what makes the core trick work: stand on a fallen stone, reverse time, and ride it back up its
+  own fall.
 * **Gravity is always down** for the live player, whichever way time runs, and the player is
   weightless for loading purposes but can still shove live boxes sideways.
 
@@ -47,7 +47,7 @@ npm run build      # production bundle in dist/
 | 2 | Interval | Two stones on the same run, let go at different moments. Sprint past the near one inside its window to reach the pad in the middle, then scrub back to walk through the far corridor, which is already sealed in the present. |
 | 3 | Ballast | The gate is on a shelf out of jumping reach and the crate is the step that closes the gap — but the crate starts on the near side of a stone that comes down four seconds in, and shoving a crate is slow. Scrub back at the pad beside it and there is time to push it through. |
 | 4 | Cascade | Three stones down a long run, each one let go too early to be beaten from where the last one left you. Every pocket between them has its own pad: reach it, put the world back to the start, walk on. The gate is up on a shelf at the end, so the last pocket has to be left with the crate. |
-| 5 | Fallback | Push the crate off the upper shelf, dive after it, stand on the anachroverter and reverse time, then ride the crate back up its own fall to the exit shelf. |
+| 5 | Lift | The introduction to the anachroverter. The gate is high up beside the place a stone hangs, and there is no way up until the stone comes down. Reverse time on the pad, climb the crate onto the resting stone, and ride it back up its own fall to the gate. |
 
 Reaching a gate advances to the next level with `ENTER`.
 

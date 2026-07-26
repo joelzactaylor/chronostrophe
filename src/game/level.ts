@@ -34,10 +34,6 @@ function fill(grid: string[][], x0: number, y0: number, x1: number, y1: number):
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = '#';
 }
 
-function carve(grid: string[][], x0: number, y0: number, x1: number, y1: number): void {
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = '.';
-}
-
 function pad(kind: DeviceKind, cx: number, surfaceRow: number, label: string): Device {
   return {
     kind,
@@ -172,39 +168,43 @@ function buildCascade(): LevelDef {
 }
 
 /**
- * "Fallback" — push the crate off the upper shelf, dive after it, then reverse
- * time and ride its rewinding worldline back up to the exit shelf.
+ * Tick at which the stone of "Lift" is let go. Early: the walk to the pad has to
+ * leave enough rewound time to climb onto the resting stone before it lifts, and
+ * enough time after it tops out to step off before the world runs out of history.
  */
-function buildFallback(): LevelDef {
+export const LIFT_RELEASE = 60;
+
+/**
+ * "Lift" — the introduction to the anachroverter. The gate is high up beside the
+ * place a stone hangs, and there is no way up: the stone has to come down first.
+ * Very early on it does, and the crate on the floor is the step onto it. Standing
+ * on the pad and reversing time sends the stone back up its own fall — so reverse
+ * time first, then climb the crate onto the resting stone and ride it up to the
+ * gate as history runs backwards. The stone is let go long before the pad is
+ * reached, so rewinding leaves a stretch of it sitting still to climb onto.
+ */
+function buildLift(): LevelDef {
   const grid = blankGrid();
   fill(grid, 0, 15, COLS - 1, ROWS - 1); // floor
-  fill(grid, 12, 14, 12, 14); // stairs
-  fill(grid, 13, 13, 13, 14);
-  fill(grid, 14, 12, 14, 14);
-  fill(grid, 15, 11, 23, 11); // shelf A
-  fill(grid, 26, 9, 31, 9); // shelf B
-  fill(grid, 34, 6, 38, 6); // exit shelf, out of jumping reach from shelf B
-  fill(grid, 43, 0, 43, 14); // right wall
-  carve(grid, 32, 15, 35, 15); // recess under the chute: the crate lands flush with the floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 28, 2, 33, 2); // gate shelf, level with the stone's hanging place
 
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
-    name: 'Fallback',
-    brief: 'The crate falls. Ride it back up.',
+    name: 'Lift',
+    brief: 'The stone falls. Reverse time and ride it back up.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [{ x: 29 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }],
-    devices: [
-      pad('chronoporter', 18, 11, 'CHRONOPORTER — drag the slider'),
-      pad('anachroverter', 31, 15, 'ANACHROVERTER — [R] reverse time'),
-      pad('chronoclast', 41, 15, 'CHRONOCLAST — history erased'),
+    boxes: [
+      // The step: too short to reach the shelf, tall enough to reach the fallen stone.
+      { x: 23 * TILE + 4, y: 15 * TILE - 28, w: 28, h: 28 },
+      monolith(24, LIFT_RELEASE),
     ],
-    hazards: [
-      { x: 9 * TILE, y: 15 * TILE - 14, w: 2 * TILE, h: 14 },
-      { x: 24 * TILE, y: 15 * TILE - 14, w: 2 * TILE, h: 14 },
-    ],
-    exit: { x: 36.5 * TILE, y: 6 * TILE - 26, r: 22 },
+    devices: [pad('anachroverter', 22, 15, 'ANACHROVERTER — [R] reverse time')],
+    hazards: [],
+    exit: { x: 29.5 * TILE, y: 2 * TILE - 26, r: 22 },
   };
 }
 
@@ -213,7 +213,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildInterval,
   buildBallast,
   buildCascade,
-  buildFallback,
+  buildLift,
 ];
 
 export function buildLevel(index = 0): LevelDef {

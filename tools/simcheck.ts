@@ -4,6 +4,7 @@
  * mechanic the level is built around. Run with `npm run check:sim`.
  */
 import { MONOLITH_RELEASE, buildLevel } from '../src/game/level';
+import { TileMap } from '../src/core/physics';
 import { NO_INPUT, World, playerRect } from '../src/core/world';
 import { Input } from '../src/core/world';
 import { TILE } from '../src/core/types';
@@ -18,16 +19,33 @@ function check(name: string, ok: boolean, detail = ''): void {
   }
 }
 
-/** Index of "Fallback", the crate/reverse-time level most of these checks exercise. */
-const FALLBACK = 4;
+/** Index of "Lift", the level that teaches reverse time. */
+const LIFT = 4;
 
-function makeWorld(): World {
-  return makeLevel(FALLBACK);
+/**
+ * A rig for the physics/recording checks rather than a shipped level: a floor with
+ * a shelf at row 9 holding a crate, and a recess in the floor beneath the shelf's
+ * right edge so a crate pushed off it lands flush with the surrounding floor.
+ */
+function rigWorld(): World {
+  const rows: string[] = [];
+  for (let y = 0; y < 17; y++) {
+    let row = '';
+    for (let x = 0; x < 44; x++) {
+      const floor = y >= 15 && !(y === 15 && x >= 32 && x <= 35);
+      const shelf = y === 9 && x >= 26 && x <= 31;
+      const wall = x === 43 && y < 15;
+      row += floor || shelf || wall ? '#' : '.';
+    }
+    rows.push(row);
+  }
+  return new World(new TileMap(rows), { x: 2 * TILE, y: 15 * TILE - 28 }, [
+    { x: 29 * TILE, y: 9 * TILE - 28, w: 28, h: 28 },
+  ]);
 }
 
-function makeLevel(index: number): World {
-  const level = buildLevel(index);
-  return new World(level.map, level.spawn, level.boxes);
+function makeWorld(): World {
+  return rigWorld();
 }
 
 function run(world: World, ticks: number, input: Input = NO_INPUT): void {
@@ -387,89 +405,65 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   }
 }
 
-// 13. Level "Fallback" is completable with the intended solution.
+// 13. Level "Lift": the stone falls, the crate is the step onto it, and reversing
+// time carries the rider back up its own fall to the gate.
 {
-  const level = buildLevel(FALLBACK);
+  const level = buildLevel(LIFT);
   const w = new World(level.map, level.spawn, level.boxes);
-  const box = w.boxes[0];
+  const crate = w.boxes[0];
+  const stone = w.boxes[1];
+  const hangingY = stone.initial.y;
   const exit = level.exit;
+  const padX = level.devices[0].rect.x;
+
   let phase = 0;
   let prevX = w.player.x;
   let stuck = 0;
-  let paradoxes = 0;
-  let won = false;
   let jumpHold = 0;
-  let touchedHazard = false;
+  let won = false;
+  let rodeStone = false;
+  let crushed = false;
 
-  for (let tick = 0; tick < 4000 && !won; tick++) {
+  for (let tick = 0; tick < 4000 && !won && !crushed; tick++) {
     const p = w.player;
     const grounded = p.groundedOn !== -2;
     const input: Input = { ...NO_INPUT };
 
     switch (phase) {
-      case 0: // run to the end of shelf A, hopping the spike pit
+      case 0: // walk to the anachroverter; the stone comes down on the way
         input.right = true;
-        if (grounded && p.x > 250 && p.x < 266 && p.y > 400) input.jumpPressed = true;
-        if (grounded && stuck > 2) input.jumpPressed = true;
-        if (p.x >= 740 && grounded && p.y < 340) phase = 1;
+        if (p.x >= padX && stone.state.y > hangingY + 200) phase = 1;
         break;
-      case 1: // clear the gap onto shelf B
-        input.right = true;
-        if (grounded && p.y > 300) input.jumpPressed = true;
-        if (grounded && p.y < 270) phase = 2;
-        break;
-      case 2: // shove the crate off the shelf
-        input.right = true;
-        if (box.state.y > 300) phase = 3;
-        break;
-      case 3: // dive after the crate into the recess
-        input.right = true;
-        if (grounded && p.y > 470) phase = 3.5;
-        break;
-      case 3.5: // climb out and step onto the anachroverter
-        input.left = true;
-        if (grounded && stuck > 2) input.jumpPressed = true;
-        if (grounded && p.y < 460 && p.x <= 1010) phase = 4;
-        break;
-      case 4: // the pad pauses the timeline; flip it and step off backwards
+      case 1: // the pad pauses the timeline: flip time and step off backwards
         w.dir = -1;
         w.splitRun();
-        phase = 5;
+        phase = 2;
         break;
-      case 5: // step onto the resting crate
+      case 2: // climb the crate, then step onto the resting stone
         input.right = true;
-        if (p.groundedOn === 0) phase = 6;
-        else if (grounded && stuck > 2) input.jumpPressed = true;
+        if (grounded && stuck > 1) input.jumpPressed = true;
+        if (p.groundedOn === stone.id) phase = 3;
         break;
-      case 6: // ride the rewinding worldline upward
-        if (box.state.y < 275) {
-          input.jumpPressed = true;
-          input.jump = true;
-          input.right = true;
-          phase = 7;
-        }
+      case 3: // ride the rewinding stone up to its hanging place
+        rodeStone = rodeStone || stone.state.y < hangingY + 120;
+        if (stone.state.y < hangingY + 8) phase = 4;
         break;
-      case 7: // land on the exit shelf and walk into the black hole
+      case 4: // step off onto the shelf and walk into the gate
         input.right = true;
-        input.jump = p.vy < 0;
         break;
     }
 
-    // Hold the jump key for a full-height jump, the way a player would.
     if (input.jumpPressed) jumpHold = 12;
     jumpHold = Math.max(0, jumpHold - 1);
     input.jump = input.jump || jumpHold > 0;
 
-    if (phase !== 4) w.step(input);
-    if (w.detectParadox()) paradoxes++;
+    if (phase !== 1) w.step(input);
+    crushed = w.crushed;
 
     stuck = Math.abs(w.player.x - prevX) < 0.3 ? stuck + 1 : 0;
     prevX = w.player.x;
 
     const pr = playerRect(w.player);
-    if (level.hazards.some((h) => pr.x < h.x + h.w && pr.x + pr.w > h.x && pr.y < h.y + h.h && pr.y + pr.h > h.y)) {
-      touchedHazard = true;
-    }
     won =
       pr.x < exit.x + exit.r &&
       pr.x + pr.w > exit.x - exit.r &&
@@ -478,9 +472,10 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
     if (w.atTimeBound()) break;
   }
 
-  check('the level can be completed with the intended solution', won, `phase=${phase} t=${w.now}`);
-  check('the intended route never touches a hazard', !touchedHazard);
-  console.log(`       (paradox ticks during the run: ${paradoxes})`);
+  check('"Lift" can be completed with the intended solution', won, `phase=${phase} t=${w.now} y=${w.player.y}`);
+  check('"Lift" carries the player up on the rewinding stone', rodeStone, `stone y=${stone.state.y}`);
+  check('"Lift" does not crush the player on the intended route', !crushed);
+  check('the crate stays clear of where the stone lands', crate.initial.x + crate.w <= stone.initial.x);
 }
 
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);
