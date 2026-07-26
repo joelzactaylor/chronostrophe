@@ -115,21 +115,27 @@ function buildInterval(): LevelDef {
 }
 
 /**
- * "Sealed" — the stone comes down on the gate itself. Walking up to it in the
- * present finds the way out buried; the pad is close enough that from an early
- * tick the gate can be reached in the second before it is sealed.
+ * "Ballast" — the gate sits on a shelf three tiles up, out of jumping reach; the
+ * crate on the floor is the step that closes the gap. The crate starts on the near
+ * side of a stone that comes down four seconds in, and shoving a crate is slow
+ * enough that it cannot be walked over from the spawn in time. From the pad beside
+ * it, on a clock put back to the start, there is room to push it through.
  */
-function buildSealed(): LevelDef {
-  const map = new TileMap(corridorGrid().map((r) => r.join('')));
+function buildBallast(): LevelDef {
+  const grid = corridorGrid();
+  fill(grid, 30, 12, 34, 12); // gate shelf: 3 tiles up, a crate's height short of a jump
+  fill(grid, 30, 13, 30, 14); // the shelf's near face, which the crate stops against
+  const map = new TileMap(grid.map((r) => r.join('')));
+
   return {
-    name: 'Sealed',
-    brief: 'The gate does not stay open.',
+    name: 'Ballast',
+    brief: 'The crate is the step. Get it through.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [monolith(38, 90)],
-    devices: [pad('chronoporter', 33, 15, PORTER_LABEL)],
+    boxes: [{ x: 20 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(24, 240)],
+    devices: [pad('chronoporter', 19, 15, PORTER_LABEL)],
     hazards: [],
-    exit: { x: 40 * TILE, y: 15 * TILE - 26, r: 22 },
+    exit: { x: 32.5 * TILE, y: 12 * TILE - 26, r: 22 },
   };
 }
 
@@ -137,21 +143,31 @@ function buildSealed(): LevelDef {
  * "Cascade" — three stones spread down a long run, each one let go too early to be
  * beaten from where the last one left you. Every pocket between them holds its own
  * pad: reach it, put the world back to the start, and the next corridor is walkable.
+ * The gate is up on a shelf at the end, so the last pocket has to be left with the
+ * crate rather than ahead of it.
  */
 function buildCascade(): LevelDef {
-  const map = new TileMap(corridorGrid().map((r) => r.join('')));
+  const grid = corridorGrid();
+  fill(grid, 36, 12, 41, 12); // gate shelf above the last pocket
+  fill(grid, 36, 13, 36, 14); // its near face: where the crate comes to a stop
+  const map = new TileMap(grid.map((r) => r.join('')));
   return {
     name: 'Cascade',
-    brief: 'Three stones. One pocket at a time.',
+    brief: 'Three stones, then a climb.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [monolith(10, 150), monolith(20, 160), monolith(30, 120)],
+    boxes: [
+      monolith(10, 150),
+      monolith(20, 160),
+      monolith(30, 120),
+      { x: 33 * TILE, y: 15 * TILE - 28, w: 28, h: 28 },
+    ],
     devices: [
       pad('chronoporter', 16, 15, PORTER_LABEL),
       pad('chronoporter', 26, 15, PORTER_LABEL),
     ],
     hazards: [],
-    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+    exit: { x: 38.5 * TILE, y: 12 * TILE - 26, r: 22 },
   };
 }
 
@@ -195,7 +211,7 @@ function buildFallback(): LevelDef {
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
-  buildSealed,
+  buildBallast,
   buildCascade,
   buildFallback,
 ];

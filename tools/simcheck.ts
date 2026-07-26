@@ -306,21 +306,73 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
     for (let i = 0; i < 900 && !won; i++) {
       w.step({ ...NO_INPUT, right: true, jump: true, jumpPressed: i % 20 === 0 });
       const pr = playerRect(w.player);
-      won = pr.x + pr.w > level.exit.x - level.exit.r && pr.x < level.exit.x + level.exit.r;
+      won =
+        pr.x < level.exit.x + level.exit.r &&
+        pr.x + pr.w > level.exit.x - level.exit.r &&
+        pr.y < level.exit.y + level.exit.r &&
+        pr.y + pr.h > level.exit.y - level.exit.r;
       if (w.atTimeBound()) break;
     }
     return { won, x: w.player.x };
   }
 
-  // Per level: its index, and the tick of the stone the first pad has to be reached
-  // ahead of, where the level opens with a sprint.
-  for (const [index, dash] of [
-    [1, 150],
-    [2, null],
-    [3, 150],
-  ] as [number, number | null][]) {
+  /**
+   * The crate levels: walk right and scrub on every pad as above, but once the last
+   * pad has been used, shove the crate to `crateTo` and climb it onto the gate shelf.
+   */
+  function playCrateLevel(index: number): { won: boolean; crushed: boolean; padTicks: number[]; now: number; x: number; y: number } {
     const level = buildLevel(index);
-    const r = playPorterLevel(index);
+    const w = new World(level.map, level.spawn, level.boxes);
+    const pads = level.devices.map((d) => d.rect.x);
+    const padTicks: number[] = [];
+    let next = 0;
+    let won = false;
+    let crushed = false;
+    let jumpHold = 0;
+    let prevX = w.player.x;
+    let stuck = 0;
+
+    for (let i = 0; i < 1500 && !won && !crushed; i++) {
+      const grounded = w.player.groundedOn !== -2;
+      const input: Input = { ...NO_INPUT, right: true };
+      // The crate jams against the shelf's face: climb it, then climb onto the shelf.
+      if (next >= pads.length && grounded && stuck > 1) input.jumpPressed = true;
+      if (input.jumpPressed) jumpHold = 12;
+      jumpHold = Math.max(0, jumpHold - 1);
+      input.jump = jumpHold > 0;
+
+      w.step(input);
+      crushed = w.crushed;
+      if (next < pads.length && w.player.x >= pads[next]) {
+        padTicks.push(w.now);
+        next++;
+        w.splitRun();
+        w.scrubTo(RESET_TICK);
+      }
+      stuck = Math.abs(w.player.x - prevX) < 0.3 ? stuck + 1 : 0;
+      prevX = w.player.x;
+
+      const pr = playerRect(w.player);
+      won =
+        pr.x < level.exit.x + level.exit.r &&
+        pr.x + pr.w > level.exit.x - level.exit.r &&
+        pr.y < level.exit.y + level.exit.r &&
+        pr.y + pr.h > level.exit.y - level.exit.r;
+      if (w.atTimeBound()) break;
+    }
+    return { won, crushed, padTicks, now: w.now, x: w.player.x, y: w.player.y };
+  }
+
+  // Per level: its index, the tick of the stone the first pad has to be reached ahead
+  // of where the level opens with a sprint, and whether a crate has to be shoved into
+  // place to finish.
+  for (const [index, dash, crate] of [
+    [1, 150, false],
+    [2, null, true],
+    [3, 150, true],
+  ] as [number, number | null, boolean][]) {
+    const level = buildLevel(index);
+    const r = crate ? playCrateLevel(index) : playPorterLevel(index);
     check(`"${level.name}" is completable with the chronoporter alone`, r.won, `t=${r.now} x=${r.x} pads=${r.padTicks}`);
     check(`"${level.name}" does not crush the player on the intended route`, !r.crushed);
     check(`"${level.name}" uses every pad in the level`, r.padTicks.length === level.devices.length, `${r.padTicks}`);
