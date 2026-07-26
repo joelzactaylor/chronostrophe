@@ -451,15 +451,50 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0x05030a, 1).fillCircle(e.x, e.y, e.r * 0.72);
   }
 
+  /**
+   * The ground a suspended stone will come to rest on, so the warning marks stop
+   * where the stone stops instead of running off the level.
+   */
+  private restRowUnder(r: Rect): number {
+    const map = this.level.map;
+    const cx0 = Math.floor(r.x / TILE);
+    const cx1 = Math.floor((r.x + r.w - 1) / TILE);
+    for (let cy = Math.floor((r.y + r.h) / TILE); cy < map.rows; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) if (map.isSolid(cx, cy)) return cy * TILE;
+    }
+    return map.heightPx;
+  }
+
+  /**
+   * Where a held stone is going to fall: a dim shaded column and a hatched
+   * landing footprint rather than beams, so it reads as a marked-off space.
+   */
+  private drawDropCorridor(g: Phaser.GameObjects.Graphics, r: Rect): void {
+    const floorY = this.restRowUnder(r);
+    const top = r.y + r.h;
+    const h = floorY - top;
+    if (h <= 0) return;
+    const breathe = 0.06 + 0.03 * Math.sin(this.time.now / 700);
+    g.fillStyle(COL_SINGULARITY, breathe).fillRect(r.x, top, r.w, h);
+    g.fillStyle(COL_SINGULARITY, breathe * 1.6).fillRect(r.x, floorY - r.h, r.w, r.h);
+    // Diagonal hatching across the footprint.
+    g.lineStyle(1, COL_SINGULARITY, 0.22);
+    for (let x = r.x - r.h; x < r.x + r.w; x += 12) {
+      const x0 = Math.max(r.x, x);
+      const y0 = floorY - r.h + (x0 - x);
+      const x1 = Math.min(r.x + r.w, x + r.h);
+      const y1 = floorY - (x + r.h - x1);
+      if (x1 > x0) g.lineBetween(x0, y0, x1, y1);
+    }
+    g.lineStyle(1, COL_SINGULARITY, 0.3);
+    g.lineBetween(r.x, floorY - r.h, r.x + r.w, floorY - r.h);
+  }
+
   /** Stone that history hangs on: suspended until its tick, then immovable. */
   private drawMonolith(g: Phaser.GameObjects.Graphics, box: Box): void {
     const r = boxRect(box);
     const held = this.world.now < box.releaseTick;
-    if (held) {
-      const t = this.time.now / 220;
-      g.lineStyle(1, COL_SINGULARITY, 0.35 + 0.2 * Math.sin(t));
-      for (let x = r.x + 8; x < r.x + r.w; x += 24) g.lineBetween(x, r.y + r.h, x, r.y + r.h + 520);
-    }
+    if (held) this.drawDropCorridor(g, r);
     g.fillStyle(0x151226, 1).fillRect(r.x, r.y, r.w, r.h);
     g.fillStyle(held ? 0x3a3550 : 0x4a4466, 1).fillRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
     g.lineStyle(2, 0x6d4bd6, held ? 0.5 : 0.85).strokeRect(r.x, r.y, r.w, r.h);
