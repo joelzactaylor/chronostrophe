@@ -49,10 +49,15 @@ npm run build      # production bundle in dist/
 ## Paradox and singularities
 
 A paradox is not "touching a ghost" — you can walk straight through your former selves. It is
-invalidating the world conditions a recorded run needed: pinning a box into its recorded path where
-the ghost cannot shove it away, or removing the box it stood on. When that happens the contradiction spawns a **singularity** that replays the
-contradicted run from the interference point at double speed and then homes in on you. Capture warps
-the screen through a fisheye collapse and restarts the level.
+invalidating the world conditions a recorded run needed:
+
+* a former self is left **standing on nothing** — the crate that held it up is somewhere else now;
+* a crate sits **where a former self's body was**, and the ghost cannot shove it clear.
+
+The moment that happens the ghost stops being history: it is replaced by a **fuse ghost** that burns
+red where the contradiction occurred, then ignites into a **singularity** which replays the
+contradicted run from that point at double speed and finally homes in on you. Capture warps the screen
+through a fisheye collapse and restarts the level.
 
 ## Fail states
 

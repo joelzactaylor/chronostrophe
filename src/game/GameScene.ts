@@ -13,7 +13,17 @@ export interface Singularity {
   y: number;
   homing: boolean;
   born: number;
+  /** Ticks left of the fuse: the contradicted ghost burning in place before it moves. */
+  fuse: number;
+  ducking: boolean;
+  facing: 1 | -1;
 }
+
+/** How long a contradicted ghost burns as a fuse ghost before it starts chasing. */
+const FUSE_TICKS = 45;
+
+/** Ticks of immunity after a restart or a timeline edit before history is judged again. */
+const PARADOX_GRACE = 30;
 
 const COL_BG = 0x0b0714;
 const COL_TILE = 0x241a44;
@@ -41,7 +51,7 @@ export class GameScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private jumpQueued = false;
   private acc = 0;
-  private paradoxGrace = 90;
+  private paradoxGrace = PARADOX_GRACE;
   private lastClast: Device | null = null;
   private effectT = 0;
   private fisheye: FisheyePipeline | null = null;
@@ -59,7 +69,7 @@ export class GameScene extends Phaser.Scene {
     this.singularities = [];
     this.acc = 0;
     this.effectT = 0;
-    this.paradoxGrace = 90;
+    this.paradoxGrace = PARADOX_GRACE;
     this.jumpQueued = false;
     this.activeDevice = null;
     this.lastClast = null;
@@ -186,9 +196,11 @@ export class GameScene extends Phaser.Scene {
     if (this.paradoxGrace === 0) {
       const paradox = world.detectParadox();
       if (paradox) {
-        this.paradoxGrace = 120;
+        this.paradoxGrace = PARADOX_GRACE;
         this.lastParadoxReason = paradox.reason;
+        // The contradicted ghost is not a ghost any more: it becomes the fuse.
         this.spawnSingularity(paradox.tick, paradox.run.states, paradox.run.dir);
+        world.removeRun(paradox.run);
         this.message = `PARADOX — ${paradox.reason.toUpperCase()}`;
       }
     }
@@ -203,7 +215,7 @@ export class GameScene extends Phaser.Scene {
       if (crushed) return this.fail('death', 'CRUSHED');
     }
     for (const s of this.singularities) {
-      if (rectsOverlap(pr, { x: s.x, y: s.y, w: 20, h: 28 })) {
+      if (s.fuse <= 0 && rectsOverlap(pr, { x: s.x, y: s.y, w: 20, h: 28 })) {
         return this.fail('fisheye', 'SINGULARITY CAPTURE');
       }
     }
@@ -229,7 +241,7 @@ export class GameScene extends Phaser.Scene {
         this.lastClast = found;
         world.erasePlayerHistory();
         this.singularities = [];
-        this.paradoxGrace = 90;
+        this.paradoxGrace = PARADOX_GRACE;
         this.message = 'CHRONOCLAST — RECORDED HISTORY ERASED';
       }
     } else {
@@ -245,7 +257,7 @@ export class GameScene extends Phaser.Scene {
       // Stepping off a pausing pad always closes the recording segment: the body
       // moved while the timeline stood still, so what follows is a new worldline.
       world.splitRun();
-      this.paradoxGrace = 90;
+      this.paradoxGrace = PARADOX_GRACE;
       this.activeDevice = null;
       world.paused = false;
       this.message = `TIME RESUMES ${world.dir === 1 ? 'FORWARD' : 'BACKWARD'}`;
@@ -261,13 +273,27 @@ export class GameScene extends Phaser.Scene {
       if (!s) break;
       path.push(s);
     }
-    if (path.length < 2) return;
-    this.singularities.push({ path, idx: 0, x: path[0].x, y: path[0].y, homing: false, born: this.time.now });
+    if (path.length < 1) return;
+    this.singularities.push({
+      path,
+      idx: 0,
+      x: path[0].x,
+      y: path[0].y,
+      homing: path.length < 2,
+      born: this.time.now,
+      fuse: FUSE_TICKS,
+      ducking: path[0].ducking,
+      facing: path[0].facing,
+    });
   }
 
   private advanceSingularities(): void {
     const p = this.world.player;
     for (const s of this.singularities) {
+      if (s.fuse > 0) {
+        s.fuse--;
+        continue;
+      }
       if (!s.homing) {
         // Double speed: the consequence outruns the history that produced it.
         s.idx += 2;
@@ -470,7 +496,27 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(1, COL_GHOST, 0.55).strokeRect(r.x, r.y, r.w, r.h);
   }
 
+  /** A contradicted ghost, burning where its history broke, about to come after you. */
+  private drawFuseGhost(g: Phaser.GameObjects.Graphics, s: Singularity): void {
+    const t = this.time.now / 90;
+    const heat = 1 - s.fuse / FUSE_TICKS;
+    this.drawBody(g, s, COL_SINGULARITY, 0.55 + heat * 0.45);
+    const r = playerRect(s);
+    for (let i = 3; i >= 1; i--) {
+      g.lineStyle(2, i % 2 === 0 ? 0xffd166 : COL_SINGULARITY, (0.15 + heat * 0.25) * i * 0.5);
+      const pad = i * 4 + Math.sin(t * 2 + i) * 2;
+      g.strokeRect(r.x - pad, r.y - pad, r.w + pad * 2, r.h + pad * 2);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = t * 3 + (i * Math.PI) / 3;
+      const rad = 14 + Math.sin(t * 4 + i) * 5;
+      g.fillStyle(i % 2 === 0 ? 0xffd166 : 0xffffff, 0.5 + heat * 0.5);
+      g.fillRect(r.x + r.w / 2 + Math.cos(a) * rad, r.y + r.h / 2 + Math.sin(a) * rad, 3, 3);
+    }
+  }
+
   private drawSingularity(g: Phaser.GameObjects.Graphics, s: Singularity): void {
+    if (s.fuse > 0) return this.drawFuseGhost(g, s);
     const t = this.time.now / 120;
     const r: Rect = { x: s.x, y: s.y, w: 20, h: 28 };
     for (let i = 3; i >= 1; i--) {
