@@ -3,7 +3,7 @@
  * scrubbing, reverse-time worldline replay and the "ride the rewinding box"
  * mechanic the level is built around. Run with `npm run check:sim`.
  */
-import { buildLevel } from '../src/game/level';
+import { MONOLITH_RELEASE, buildLevel } from '../src/game/level';
 import { NO_INPUT, World, playerRect } from '../src/core/world';
 import { Input } from '../src/core/world';
 import { TILE } from '../src/core/types';
@@ -18,8 +18,13 @@ function check(name: string, ok: boolean, detail = ''): void {
   }
 }
 
+/** Level 2, "Fallback": the crate/reverse-time level most of these checks exercise. */
 function makeWorld(): World {
-  const level = buildLevel();
+  return makeLevel(1);
+}
+
+function makeLevel(index: number): World {
+  const level = buildLevel(index);
   return new World(level.map, level.spawn, level.boxes);
 }
 
@@ -195,9 +200,46 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
   );
 }
 
-// 10. The level is completable with the intended solution.
+// 10. Level 1, "Threshold": the monolith blocks the run, and scrubbing back gets you through.
 {
-  const level = buildLevel();
+  const level = buildLevel(0);
+  const w = new World(level.map, level.spawn, level.boxes);
+  const stone = w.boxes[0];
+  const held = { ...stone.initial };
+
+  run(w, MONOLITH_RELEASE - 10, { ...NO_INPUT, right: true });
+  check('the monolith hangs until its tick', stone.state.y === held.y, `y=${stone.state.y}`);
+  check('the player is still short of the monolith', w.player.x < stone.state.x, `x=${w.player.x}`);
+
+  run(w, 240, { ...NO_INPUT, right: true, jump: true, jumpPressed: true });
+  check('the monolith has fallen to the floor', stone.state.y > held.y + 200, `y=${stone.state.y}`);
+  check(
+    'the monolith walls off the run, even with jumping',
+    w.player.x + 20 <= stone.state.x + 1,
+    `x=${w.player.x} stone=${stone.state.x}`,
+  );
+  check('the exit is unreachable this way', w.player.x < level.exit.x - 100, `x=${w.player.x}`);
+
+  // Back to the chronoporter, then scrub the world to before the stone was let go.
+  const pad = level.devices[0].rect;
+  run(w, 60, { ...NO_INPUT, left: true });
+  check('the pad is reachable from the monolith face', w.player.x < pad.x + pad.w, `x=${w.player.x}`);
+  w.splitRun();
+  w.scrubTo(40);
+  check('scrubbing back re-suspends the monolith', w.boxes[0].state.y === held.y, `y=${stone.state.y}`);
+
+  let won = false;
+  for (let i = 0; i < 200 && !won; i++) {
+    w.step({ ...NO_INPUT, right: true });
+    won = Math.abs(w.player.x + 10 - level.exit.x) < level.exit.r && w.player.x > stone.state.x;
+  }
+  check('the past lets the player pass beneath the stone and reach the gate', won, `x=${w.player.x} t=${w.now}`);
+  check('and the stone falls behind them', stone.state.y > held.y + 200, `y=${stone.state.y}`);
+}
+
+// 11. Level 2 is completable with the intended solution.
+{
+  const level = buildLevel(1);
   const w = new World(level.map, level.spawn, level.boxes);
   const box = w.boxes[0];
   const exit = level.exit;

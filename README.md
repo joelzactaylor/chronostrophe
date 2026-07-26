@@ -38,6 +38,15 @@ npm run build      # production bundle in dist/
 * **Gravity is always down** for the live player, whichever way time runs, and the player is
   weightless for loading purposes but can still shove live boxes sideways.
 
+## Levels
+
+| # | level | the idea |
+| --- | --- | --- |
+| 1 | Threshold | A flat sprint for the gate. 2.5 s in, a suspended monolith is let go and walls off the run. The chronoporter sits on the near side: scrub the world back to before the stone fell, then walk under the space it is going to occupy. |
+| 2 | Fallback | Push the crate off the upper shelf, dive after it, stand on the anachroverter and reverse time, then ride the crate back up its own fall to the exit shelf. |
+
+Reaching a gate advances to the next level with `ENTER`.
+
 ## Devices
 
 | device | behaviour |

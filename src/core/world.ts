@@ -47,6 +47,18 @@ export interface Input {
 
 export const NO_INPUT: Input = { left: false, right: false, down: false, jump: false, jumpPressed: false };
 
+/** An object as a level describes it. */
+export interface BoxSpec {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Too heavy to shove: the player is stopped by it instead. */
+  immovable?: boolean;
+  /** Held in place until this tick of the timeline, then let go. */
+  releaseTick?: number;
+}
+
 export interface Box {
   id: number;
   w: number;
@@ -55,6 +67,8 @@ export interface Box {
   initial: BoxState;
   record: BoxState[];
   recordedMax: number;
+  immovable: boolean;
+  releaseTick: number;
 }
 
 export interface Paradox {
@@ -88,14 +102,24 @@ export class World {
   private buffered = 0;
   private spawn: { x: number; y: number };
 
-  constructor(map: TileMap, spawn: { x: number; y: number }, boxes: { x: number; y: number; w: number; h: number }[]) {
+  constructor(map: TileMap, spawn: { x: number; y: number }, boxes: BoxSpec[]) {
     this.map = map;
     this.spawn = spawn;
     boxes.forEach((b, i) => {
       const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0 };
       const record: BoxState[] = new Array(TICKS + 1);
       record[0] = { ...initial };
-      this.boxes.push({ id: i, w: b.w, h: b.h, state: { ...initial }, initial, record, recordedMax: 0 });
+      this.boxes.push({
+        id: i,
+        w: b.w,
+        h: b.h,
+        state: { ...initial },
+        initial,
+        record,
+        recordedMax: 0,
+        immovable: b.immovable ?? false,
+        releaseTick: b.releaseTick ?? 0,
+      });
     });
     this.player = {
       x: spawn.x,
@@ -246,7 +270,7 @@ export class World {
       const dy = nr.y - pr.y;
       if (dx === 0 && dy === 0) continue;
       for (const box of this.boxes) {
-        if (claimed.has(box.id)) continue;
+        if (claimed.has(box.id) || target < box.releaseTick) continue;
         const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         const others = this.otherBoxSolids(box);
         const riding =
@@ -276,6 +300,11 @@ export class World {
     this.applyGhostMotion(target);
     const ghosts = this.ghostSolidsAt(target);
     for (const box of all) {
+      // Held objects are pinned where the level suspended them until their tick.
+      if (target < box.releaseTick) {
+        box.state = { ...box.initial };
+        continue;
+      }
       box.state.vy = Math.min(box.state.vy + GRAVITY * DT, 900);
       const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
       const others = [...this.otherBoxSolids(box), ...ghosts];
@@ -352,7 +381,7 @@ export class World {
 
   /** The player is weightless but can shove live boxes sideways. */
   private pushBox(box: Box, dirSign: number, playerRectAfter: Rect): void {
-    if (!box || dirSign === 0) return;
+    if (!box || dirSign === 0 || box.immovable) return;
     const others = this.boxes
       .filter((o) => o !== box)
       .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
