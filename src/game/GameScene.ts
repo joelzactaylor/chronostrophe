@@ -42,9 +42,6 @@ export class GameScene extends Phaser.Scene {
   private jumpQueued = false;
   private acc = 0;
   private paradoxGrace = 90;
-  private deviceEntryTime = 0;
-  private deviceEntryDir: 1 | -1 = 1;
-  private timelineTouched = false;
   private lastClast: Device | null = null;
   private effectT = 0;
   private fisheye: FisheyePipeline | null = null;
@@ -135,7 +132,6 @@ export class GameScene extends Phaser.Scene {
   scrub(t: number): void {
     if (!this.canScrub()) return;
     this.world.scrubTo(t);
-    this.timelineTouched = true;
   }
 
   canScrub(): boolean {
@@ -243,17 +239,13 @@ export class GameScene extends Phaser.Scene {
     const pausing = found?.kind === 'chronoporter' || found?.kind === 'anachroverter';
     if (pausing && this.activeDevice !== found) {
       this.activeDevice = found;
-      this.deviceEntryTime = world.now;
-      this.deviceEntryDir = world.dir;
-      this.timelineTouched = false;
       world.paused = true;
       this.message = found!.label;
     } else if (!pausing && this.activeDevice) {
-      const changed = this.timelineTouched || world.now !== this.deviceEntryTime || world.dir !== this.deviceEntryDir;
-      if (changed) {
-        world.splitRun();
-        this.paradoxGrace = 90;
-      }
+      // Stepping off a pausing pad always closes the recording segment: the body
+      // moved while the timeline stood still, so what follows is a new worldline.
+      world.splitRun();
+      this.paradoxGrace = 90;
       this.activeDevice = null;
       world.paused = false;
       this.message = `TIME RESUMES ${world.dir === 1 ? 'FORWARD' : 'BACKWARD'}`;
