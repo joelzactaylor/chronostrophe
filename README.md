@@ -40,6 +40,8 @@ npm run build      # production bundle in dist/
 * **Gravity is always down** for the live player, whichever way time runs, and the player is
   weightless for loading purposes but can still shove live boxes sideways.
 
+Writing your own levels: [docs/AUTHORING.md](docs/AUTHORING.md).
+
 ## Levels
 
 | # | level | the idea |
