@@ -325,6 +325,115 @@ function buildLiveweight(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildOneTwo(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 6, 13, 36, 13);
+  fill(grid, 36, 14, 36, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'One–Two',
+    brief: '',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [],
+    devices: [pad('anachroverter', 7, 15, 'ANACHROVERTER')],
+    buttons: [button(10, 15, 0)],
+    phase: [...phaseBlocks(0, 9, 11, 13, 11), ...phaseBlocks(0, 14, 11, 18, 11, true), ...phaseBlocks(0, 19, 11, 23, 11), ...phaseBlocks(0, 24, 11, 28, 11, true), ...phaseBlocks(0, 29, 11, 33, 11)],
+    hazards: [{ x: 9 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 12 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildEscapement(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 16, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 15); // left wall
+  fill(grid, 12, 2, 16, 2);
+  fill(grid, 22, 2, 43, 2);
+  fill(grid, 12, 3, 16, 3);
+  fill(grid, 22, 3, 26, 3);
+  fill(grid, 43, 3, 43, 3);
+  fill(grid, 12, 4, 12, 4);
+  fill(grid, 16, 4, 16, 4);
+  fill(grid, 22, 4, 22, 4);
+  fill(grid, 26, 4, 26, 4);
+  fill(grid, 43, 4, 43, 4);
+  fill(grid, 12, 5, 12, 5);
+  fill(grid, 16, 5, 16, 5);
+  fill(grid, 22, 5, 22, 5);
+  fill(grid, 26, 5, 26, 5);
+  fill(grid, 43, 5, 43, 5);
+  fill(grid, 12, 6, 12, 6);
+  fill(grid, 16, 6, 16, 6);
+  fill(grid, 22, 6, 22, 6);
+  fill(grid, 26, 6, 26, 6);
+  fill(grid, 43, 6, 43, 6);
+  fill(grid, 12, 7, 12, 7);
+  fill(grid, 16, 7, 16, 7);
+  fill(grid, 22, 7, 22, 7);
+  fill(grid, 26, 7, 26, 7);
+  fill(grid, 43, 7, 43, 7);
+  fill(grid, 12, 8, 12, 8);
+  fill(grid, 16, 8, 16, 8);
+  fill(grid, 22, 8, 22, 8);
+  fill(grid, 26, 8, 26, 8);
+  fill(grid, 43, 8, 43, 8);
+  fill(grid, 12, 9, 12, 9);
+  fill(grid, 16, 9, 16, 9);
+  fill(grid, 22, 9, 22, 9);
+  fill(grid, 26, 9, 26, 9);
+  fill(grid, 43, 9, 43, 9);
+  fill(grid, 12, 10, 12, 10);
+  fill(grid, 16, 10, 16, 10);
+  fill(grid, 22, 10, 22, 10);
+  fill(grid, 26, 10, 26, 10);
+  fill(grid, 43, 10, 43, 10);
+  fill(grid, 12, 11, 12, 11);
+  fill(grid, 16, 11, 16, 11);
+  fill(grid, 22, 11, 22, 11);
+  fill(grid, 26, 11, 26, 11);
+  fill(grid, 43, 11, 43, 11);
+  fill(grid, 12, 12, 12, 12);
+  fill(grid, 16, 12, 16, 12);
+  fill(grid, 22, 12, 22, 12);
+  fill(grid, 26, 12, 26, 12);
+  fill(grid, 33, 12, 36, 12);
+  fill(grid, 43, 12, 43, 12);
+  fill(grid, 12, 13, 16, 13);
+  fill(grid, 22, 13, 26, 13);
+  fill(grid, 33, 13, 33, 13);
+  fill(grid, 36, 13, 36, 13);
+  fill(grid, 43, 13, 43, 13);
+  fill(grid, 4, 14, 6, 14);
+  fill(grid, 33, 14, 33, 14);
+  fill(grid, 36, 14, 36, 14);
+  fill(grid, 43, 14, 43, 14);
+  fill(grid, 1, 15, 33, 15);
+  fill(grid, 36, 15, 43, 15);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Escapement',
+    brief: '',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 15 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, monolith(8, 420)],
+    devices: [pad('anachroverter', 5, 14, 'ANACHROVERTER'), pad('anachroverter', 13, 2, 'ANACHROVERTER')],
+    buttons: [button(14, 15, 1), button(24, 15, 0)],
+    phase: [...phaseBlocks(0, 17, 2, 21, 2), ...phaseBlocks(0, 17, 10, 21, 10), ...phaseBlocks(1, 17, 8, 21, 8), ...phaseBlocks(0, 17, 6, 21, 6, true), ...phaseBlocks(1, 17, 4, 21, 4, true), ...phaseBlocks(1, 17, 12, 21, 12, true)],
+    hazards: [{ x: 13 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 43 * TILE, y: 1 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 /**  */
 function buildSwitchback(): LevelDef {
   const grid = blankGrid();
@@ -477,10 +586,12 @@ export const LEVELS: (() => LevelDef)[] = [
   buildLift,
   buildDeadweight,
   buildLiveweight,
-  buildSwitchback,
-  buildServant,
-  buildGroups,
-  buildInversion,
+  buildOneTwo,
+  buildEscapement,
+  //buildSwitchback,
+  //buildServant,
+  //buildGroups,
+  //buildInversion,
 ];
 
 export function buildLevel(index = 0): LevelDef {

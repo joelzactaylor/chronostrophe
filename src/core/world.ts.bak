@@ -101,8 +101,6 @@ export interface PhaseSpec {
   rect: Rect;
   group: number;
   inverted: boolean;
-  /** Actual solidity after the becoming-solid delay is applied. */
-  _solid?: boolean;
 }
 
 export interface Paradox {
@@ -157,6 +155,7 @@ export class World {
   readonly phase: PhaseSpec[];
   /** The groups whose button is held down as the world stands right now. */
   pressed = new Set<number>();
+  /**
 
   constructor(
     map: TileMap,
@@ -201,14 +200,13 @@ export class World {
     this.current = this.newRun();
     this.recordPlayer();
     this.updateButtons();
-    this.updatePhaseSolids();
   }
 
   /**
    * Reads every button off the state of the world: anything overlapping one holds
    * it down, and a button with nothing in it is up again the same tick. Which
-   * blocks are solid follows from that, with a becoming-solid delay applied in
-   * `updatePhaseSolids` — call that after calling this.
+   * blocks are solid follows from that, so the phase of a block is never stored,
+   * only derived — a scrub to any tick lands on the right one.
    */
   updateButtons(): void {
     const bodies: Rect[] = [playerRect(this.player), ...this.boxes.map(boxRect)];
@@ -218,53 +216,30 @@ export class World {
     );
   }
 
-  /**
-   * True while the button of this group has something in it. The solidity of phase
-   * blocks is derived in `updatePhaseSolids`, not directly from the button state.
-   */
+  /** True while the button of this group has something in it. */
   isPressed(group: number): boolean {
     return this.pressed.has(group);
   }
 
-  /** True when this phase block is actually solid (after the becoming-solid delay). */
   isSolidPhase(p: PhaseSpec): boolean {
-    return p._solid ?? false;
-  }
-
-  /**
-   * After `updateButtons()` has determined which groups are pressed, this method
-   * applies the becoming-solid delay: a phase block that *wants* to become solid
-   * only does so if no body (player, boxes, or ghosts) overlaps it. Once solid,
-   * it stays solid as long as the button state would have it solid — the delay
-   * only applies to the passable → solid transition.
-   *
-   * Monoliths (immovable boxes) are included in the overlap check so that a stone
-   * sitting in a phase slot keeps it from materialising around it.
-   */
-  updatePhaseSolids(): void {
-    const bodies: Rect[] = [playerRect(this.player), ...this.boxes.map(boxRect)];
-    for (const { state } of this.ghostsAt(this.now)) bodies.push(playerRect(state));
-
-    for (const p of this.phase) {
-      const wantsSolid = this.pressed.has(p.group) === p.inverted;
-      if (p._solid) {
-        // Already solid: stay solid as long as the button still wants it solid.
-        if (!wantsSolid) p._solid = false;
-      } else if (wantsSolid) {
-        // Wants to become solid: check if anything is inside it.
-        const blocked = bodies.some((r) => rectsOverlap(r, p.rect));
-        if (!blocked) p._solid = true;
-        // If blocked, stay passable (delay becoming solid).
-      } else {
-        // Does not want to be solid: ensure it is not.
-        p._solid = false;
-      }
-    }
+    return this.pressed.has(p.group) === p.inverted;
   }
 
   /** The phase blocks that are currently solid, as collision rects. */
   phaseSolids(): SolidRect[] {
     return this.phase.filter((p) => this.isSolidPhase(p)).map((p) => ({ ...p.rect, id: PHASE_SOLID }));
+  }
+
+  /**
+   * Phase blocks that are solid and not overlapped by `moveRect`.  Falling objects
+   * (monoliths, crates) slice through any phase block they currently occupy — the
+   * space of that one block is passable so the object does not stop on top of it.
+   * All other phase blocks remain solid as usual.
+   */
+  private phaseSolidsExcluding(moveRect: Rect): SolidRect[] {
+    return this.phase
+      .filter((p) => this.isSolidPhase(p) && !rectsOverlap(moveRect, p.rect))
+      .map((p) => ({ ...p.rect, id: PHASE_SOLID }));
   }
 
   private newRun(): Run {
@@ -300,7 +275,6 @@ export class World {
     this.current = this.newRun();
     this.recordPlayer();
     this.updateButtons();
-    this.updatePhaseSolids();
   }
 
   boxStateAt(box: Box, t: number): BoxState {
@@ -359,12 +333,66 @@ export class World {
   scrubTo(t: number): void {
     this.now = clamp(Math.round(t), 0, TICKS);
     for (const box of this.boxes) {
+      if (this.now >= box.releaseTick && box.recordedMax < this.now) {
+        // This box was released but never simulated forward to the scrubbed
+        // tick.  Project it forwards from the last known state so it shows
+        // the right position (falling, resting on ground, stopped by a crate
+        // etc.) rather than its initial suspended position.
+        this.projectBoxForward(box, box.recordedMax + 1, this.now);
+      }
       const s = this.boxStateAt(box, this.now);
       box.state = { ...s };
     }
     this.updateButtons();
-    this.updatePhaseSolids();
     this.player.groundedOn = supportUnder(playerRect(this.player), this.map, this.solids());
+  }
+
+  /**
+   * Steps a box forward tick by tick from `from` to `to` (inclusive),
+   * recording each state into `box.record[]` so that the box reads correctly
+   * both now and on any later scrub.  Respects gravity, the map, crates (both
+   * immovable and movable), phase blocks, and springs.
+   */
+  private projectBoxForward(box: Box, from: number, to: number): void {
+    const lastKnown = box.record[box.recordedMax] ?? box.initial;
+    let sx = lastKnown.x;
+    let sy = lastKnown.y;
+    let svy = lastKnown.vy;
+
+    for (let t = from; t <= to; t++) {
+      if (t < box.releaseTick) {
+        // Still held: pinned at the initial position.
+        sx = box.initial.x;
+        sy = box.initial.y;
+        svy = 0;
+        box.record[t] = { x: sx, y: sy, vx: 0, vy: 0 };
+        continue;
+      }
+      svy = Math.min(svy + GRAVITY * DT, 900);
+      const rect: Rect = { x: sx, y: sy, w: box.w, h: box.h };
+
+      // Other boxes (crates) are solid to this box.  Phase blocks the
+      // object currently occupies are passable so it falls through them
+      // rather than stopping on top of — the block becomes solid only
+      // after the object has cleared its volume.
+      const others: SolidRect[] = this.boxes
+        .filter((o) => o !== box && !o.immovable)
+        .map((o) => {
+          const st = this.boxStateAt(o, t);
+          return { x: st.x, y: st.y, w: o.w, h: o.h, id: o.id };
+        })
+        .concat(this.phaseSolidsExcluding(rect), this.springs);
+
+      moveX(rect, 0, this.map, others);
+      const v = moveY(rect, svy * DT, this.map, others);
+      if (v.groundedOn !== GROUND_NONE || v.ceiling) svy = 0;
+
+      sx = rect.x;
+      sy = rect.y;
+      box.record[t] = { x: sx, y: sy, vx: 0, vy: svy };
+    }
+
+    box.recordedMax = Math.max(box.recordedMax, to);
   }
 
   private recordPlayer(): void {
@@ -377,7 +405,6 @@ export class World {
   /** Advances the authoritative timeline by one tick and simulates the world into it. */
   step(input: Input): void {
     this.updateButtons();
-    this.updatePhaseSolids();
     const target = clamp(this.now + this.dir, 0, TICKS);
     const before = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
 
@@ -407,7 +434,6 @@ export class World {
    */
   stepPlayerFrozen(input: Input): void {
     this.updateButtons();
-    this.updatePhaseSolids();
     this.stepPlayer(input);
   }
 

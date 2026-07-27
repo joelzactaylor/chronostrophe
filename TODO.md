@@ -1,8 +1,8 @@
-# Fix: Box state gap after skipping forward in time
+# HudScene Timeline Fixes
 
-## Steps
-
-- [x] 1. `src/core/world.ts` — Fix `boxStateAt()` to search backwards for the last known recorded state instead of falling back to `box.initial` for undefined entries.
-- [x] 2. `src/core/world.ts` — Fix `stepBoxesForward()` to fill gaps in the box record before recording new ticks.
-- [x] 3. Verify the fix compiles correctly — ✅ `tsc --noEmit` passes with zero errors.
+## Tasks
+- [x] Create TODO.md
+- [x] Edit 1: Shift coloured run segments down — change y from `TRACK_Y - 12` to `TRACK_Y - 2` (runs loop)
+- [x] Edit 2: Shift coloured current-run segment down — change y from `TRACK_Y - 12` to `TRACK_Y - 2` (current block)
+- [x] Edit 3: Make monolith markers more prominent — height 9→16, opacity 0.7→1.0, width 2→3
 
