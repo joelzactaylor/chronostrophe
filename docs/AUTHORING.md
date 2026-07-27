@@ -130,6 +130,27 @@ shortest of the four rect exits before anything moves that tick, so bodies and c
 sideways instead of being lifted onto each other. A fix-up larger than the player's own width is
 still a crush, and still kills.
 
+## The in-game editor
+
+Press `E` on the menu and type the editor code `8147`. The editor draws the same data a level
+function holds, so anything you draw can be played at once and printed as that function's source.
+
+| | |
+|---|---|
+| paint / place | left click (drag to paint) |
+| clear a tile | right click, or the ERASE tool |
+| tools | `1` wall, `2` erase, `3` spawn, `4` gate, `5` crate, `6` monolith, `7` chronoporter, `8` anachroverter, `9` chronoclast, `0` spikes, `B` button, `P` phase block, `O` inverted phase block |
+| button/phase group | `G` cycles it; a group is drawn in its own colour, and blocks answer the button of the same colour |
+| monolith release tick | `[` and `]`, in steps of 30 (60 ticks is a second) |
+| rename | `F2` |
+| test play | `T` — `ESC` in the level brings you straight back |
+| export | `X` — the `build…` function, with a COPY button |
+| clear | `N` |
+| leave | `ESC` |
+
+The draft is kept in `localStorage`, so it survives a reload. Exporting does not add the level to the
+game: paste the printed function into `src/game/level.ts` and add its name to `LEVELS`.
+
 ## Verifying it
 
 `tools/simcheck.ts` drives `World` headlessly, with no Phaser and no rendering, and `npm run check`

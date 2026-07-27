@@ -27,14 +27,14 @@ export interface LevelDef {
   phase?: PhaseSpec[];
 }
 
-const COLS = 44;
-const ROWS = 17;
+export const COLS = 44;
+export const ROWS = 17;
 
-function blankGrid(): string[][] {
+export function blankGrid(): string[][] {
   return Array.from({ length: ROWS }, () => new Array<string>(COLS).fill('.'));
 }
 
-function fill(grid: string[][], x0: number, y0: number, x1: number, y1: number): void {
+export function fill(grid: string[][], x0: number, y0: number, x1: number, y1: number): void {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) grid[y][x] = '#';
 }
 
@@ -45,13 +45,14 @@ function fill(grid: string[][], x0: number, y0: number, x1: number, y1: number):
  */
 const PAD_MARGIN = (TILE - PLAYER_W) / 2;
 
-function pad(kind: DeviceKind, cx: number, surfaceRow: number, label: string): Device {
+/** The volume of a pad standing on `surfaceRow`. */
+export function padRect(cx: number, surfaceRow: number): Rect {
   const h = PLAYER_H + PAD_MARGIN;
-  return {
-    kind,
-    rect: { x: cx * TILE, y: surfaceRow * TILE - h, w: TILE, h },
-    label,
-  };
+  return { x: cx * TILE, y: surfaceRow * TILE - h, w: TILE, h };
+}
+
+export function pad(kind: DeviceKind, cx: number, surfaceRow: number, label: string): Device {
+  return { kind, rect: padRect(cx, surfaceRow), label };
 }
 
 /** A button is a shallow plate: it is stood in, not on, and never collides. */
@@ -126,7 +127,7 @@ function buildThreshold(): LevelDef {
 }
 
 /** A screen-wide floor with walls at both ends: the shape every chronoporter level uses. */
-function corridorGrid(): string[][] {
+export function corridorGrid(): string[][] {
   const grid = blankGrid();
   fill(grid, 0, 15, COLS - 1, ROWS - 1);
   fill(grid, 0, 0, 0, 14);
@@ -135,7 +136,7 @@ function corridorGrid(): string[][] {
 }
 
 /** A 4x3 stone suspended overhead, let go at `releaseTick`. */
-function monolith(cx: number, releaseTick: number): BoxSpec {
+export function monolith(cx: number, releaseTick: number): BoxSpec {
   return { x: cx * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick };
 }
 

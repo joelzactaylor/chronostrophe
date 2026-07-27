@@ -57,6 +57,12 @@ Writing your own levels: [docs/AUTHORING.md](docs/AUTHORING.md).
 Reaching a gate advances to the next level with `ENTER`. Every level is unlocked from the start:
 the menu is the first thing the game shows, and `ESC` returns to it.
 
+## The level editor
+
+Press `E` on the menu and type `8147`. Draw a level with the mouse, `T` to play it, `X` to export
+the `build…` function to paste into `src/game/level.ts`. Controls are in
+[docs/AUTHORING.md](docs/AUTHORING.md).
+
 ## Buttons
 
 A button is pressed while anything is resting in it — you, a former self, a crate, a monolith — and

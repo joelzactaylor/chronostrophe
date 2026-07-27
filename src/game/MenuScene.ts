@@ -9,6 +9,9 @@ const TOP = 150;
 const LEFT = 120;
 const WIDTH = VIEW_W - 240;
 
+/** The way into the level editor: press E on the menu and type it. */
+const EDITOR_CODE = '8147';
+
 /**
  * Level select. Everything is unlocked: the levels teach one device each and are
  * meant to be dipped into in any order.
@@ -17,6 +20,9 @@ export class MenuScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private rows: Phaser.GameObjects.Text[] = [];
   private cursor = 0;
+  /** Digits typed since E was pressed; null while the menu is just a menu. */
+  private code: string | null = null;
+  private prompt!: Phaser.GameObjects.Text;
 
   constructor() {
     super('menu');
@@ -52,6 +58,14 @@ export class MenuScene extends Phaser.Scene {
       });
     });
 
+    this.prompt = this.add
+      .text(VIEW_W / 2, VIEW_H - 34, '', {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#8892bd',
+      })
+      .setOrigin(0.5);
+
     const kb = this.input.keyboard!;
     kb.on('keydown-UP', () => this.move(-1));
     kb.on('keydown-DOWN', () => this.move(1));
@@ -60,6 +74,7 @@ export class MenuScene extends Phaser.Scene {
     kb.on('keydown-ENTER', () => this.play(this.cursor));
     kb.on('keydown-SPACE', () => this.play(this.cursor));
     kb.on('keydown', (e: KeyboardEvent) => {
+      if (this.typeCode(e)) return;
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= LEVELS.length) this.play(n - 1);
     });
@@ -74,6 +89,37 @@ export class MenuScene extends Phaser.Scene {
       const row = this.rowAt(p);
       if (row !== null) this.play(row);
     });
+  }
+
+  /**
+   * The editor's code, typed a digit at a time after E. Returns true while the
+   * menu is listening for it, so the digits do not also start a level.
+   */
+  private typeCode(e: KeyboardEvent): boolean {
+    if (this.code === null) {
+      if (e.key.toLowerCase() !== 'e') return false;
+      this.code = '';
+      return true;
+    }
+    if (e.key === 'Escape') {
+      this.code = null;
+      return true;
+    }
+    if (e.key === 'Backspace') {
+      this.code = this.code.slice(0, -1);
+      return true;
+    }
+    if (!/^[0-9]$/.test(e.key)) return true;
+    this.code += e.key;
+    if (this.code === EDITOR_CODE) {
+      this.code = null;
+      sfx.unlock();
+      sfx.menuSelect();
+      fadeOutThen(this, 200, () => this.scene.start('editor'));
+    } else if (!EDITOR_CODE.startsWith(this.code)) {
+      this.code = '';
+    }
+    return true;
   }
 
   private rowAt(p: Phaser.Input.Pointer): number | null {
@@ -109,5 +155,6 @@ export class MenuScene extends Phaser.Scene {
     });
 
     g.fillStyle(0x8892bd, 0.7).fillRect(LEFT, VIEW_H - 52, WIDTH, 1);
+    this.prompt.setText(this.code === null ? '' : `editor code ${'*'.repeat(this.code.length)}_`);
   }
 }

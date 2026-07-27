@@ -80,8 +80,10 @@ export class GameScene extends Phaser.Scene {
   livedPath: LivedStep[] = [];
   lastParadoxReason = '';
   levelIndex = 0;
+  /** A level being edited, played straight from the editor instead of the list. */
+  draft: LevelDef | null = null;
   get hasNextLevel(): boolean {
-    return this.levelIndex + 1 < LEVELS.length;
+    return this.draft === null && this.levelIndex + 1 < LEVELS.length;
   }
 
   private gfx!: Phaser.GameObjects.Graphics;
@@ -102,12 +104,13 @@ export class GameScene extends Phaser.Scene {
     super('game');
   }
 
-  init(data: { level?: number }): void {
+  init(data: { level?: number; draft?: LevelDef | null }): void {
     if (typeof data.level === 'number') this.levelIndex = data.level;
+    if (data.draft !== undefined) this.draft = data.draft;
   }
 
   create(): void {
-    this.level = buildLevel(this.levelIndex);
+    this.level = this.draft ?? buildLevel(this.levelIndex);
     this.world = new World(
       this.level.map,
       this.level.spawn,
@@ -164,6 +167,10 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-ESC', () => this.openMenu());
     kb.on('keydown-ENTER', () => {
       if (this.state !== 'won' || !this.captureDone) return;
+      if (this.draft) {
+        this.openMenu();
+        return;
+      }
       const next = this.hasNextLevel ? this.levelIndex + 1 : 0;
       fadeOutThen(this, 220, () => this.scene.restart({ level: next }));
     });
@@ -207,10 +214,13 @@ export class GameScene extends Phaser.Scene {
     sfx.reverse();
   }
 
+  /** Back to wherever this run came from: the editor for a draft, the list otherwise. */
   openMenu(): void {
+    const draft = this.draft;
     fadeOutThen(this, 200, () => {
       this.scene.stop('hud');
-      this.scene.start('menu');
+      if (draft) this.scene.start('editor');
+      else this.scene.start('menu');
     });
   }
 
@@ -221,7 +231,7 @@ export class GameScene extends Phaser.Scene {
    */
   abandonRun(): void {
     if (this.state === 'play') this.fail('death', 'RUN ABANDONED');
-    else fadeOutThen(this, 200, () => this.scene.restart({ level: this.levelIndex }));
+    else fadeOutThen(this, 200, () => this.scene.restart({ level: this.levelIndex, draft: this.draft }));
   }
 
   /** Called by the HUD while the player scrubs the slider on a chronoporter. */
@@ -551,7 +561,7 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.setAlpha(clamp(1 - this.effectT / 2200, 0, 1));
     }
     if (this.state !== 'won' && this.effectT > (this.state === 'death' ? 1100 : 2100)) {
-      fadeOutThen(this, 240, () => this.scene.restart({ level: this.levelIndex }));
+      fadeOutThen(this, 240, () => this.scene.restart({ level: this.levelIndex, draft: this.draft }));
     }
   }
 
