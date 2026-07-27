@@ -6,6 +6,7 @@ import {
   GROUND_GHOST,
   GROUND_NONE,
   GROUND_TILE,
+  PHASE_SOLID,
   PlayerState,
   Rect,
   Run,
@@ -72,6 +73,26 @@ export interface Box {
   releaseTick: number;
 }
 
+/**
+ * A push button: pressed for as long as anything at all rests in it — the live
+ * body, a former self, a crate, a stone — and released the instant nothing does.
+ * It is not solid; things stand in it, not on it.
+ */
+export interface ButtonSpec {
+  rect: Rect;
+  group: number;
+}
+
+/**
+ * A block that is solid while its group's button is up and passable while it is
+ * pressed, or the other way round when `inverted`.
+ */
+export interface PhaseSpec {
+  rect: Rect;
+  group: number;
+  inverted: boolean;
+}
+
 export interface Paradox {
   run: Run;
   tick: number;
@@ -114,14 +135,23 @@ export class World {
    */
   private readonly deviceSolids: SolidRect[];
 
+  readonly buttons: ButtonSpec[];
+  readonly phase: PhaseSpec[];
+  /** The groups whose button is held down as the world stands right now. */
+  pressed = new Set<number>();
+
   constructor(
     map: TileMap,
     spawn: { x: number; y: number },
     boxes: BoxSpec[],
     devices: Rect[] = [],
+    buttons: ButtonSpec[] = [],
+    phase: PhaseSpec[] = [],
   ) {
     this.map = map;
     this.spawn = spawn;
+    this.buttons = buttons;
+    this.phase = phase;
     this.deviceSolids = devices.map((r) => ({ ...r, id: DEVICE_SOLID }));
     boxes.forEach((b, i) => {
       const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0 };
@@ -150,6 +180,35 @@ export class World {
     };
     this.current = this.newRun();
     this.recordPlayer();
+    this.updateButtons();
+  }
+
+  /**
+   * Reads every button off the state of the world: anything overlapping one holds
+   * it down, and a button with nothing in it is up again the same tick. Which
+   * blocks are solid follows from that, so the phase of a block is never stored,
+   * only derived — a scrub to any tick lands on the right one.
+   */
+  updateButtons(): void {
+    const bodies: Rect[] = [playerRect(this.player), ...this.boxes.map(boxRect)];
+    for (const { state } of this.ghostsAt(this.now)) bodies.push(playerRect(state));
+    this.pressed = new Set(
+      this.buttons.filter((b) => bodies.some((r) => rectsOverlap(r, b.rect))).map((b) => b.group),
+    );
+  }
+
+  /** True while the button of this group has something in it. */
+  isPressed(group: number): boolean {
+    return this.pressed.has(group);
+  }
+
+  isSolidPhase(p: PhaseSpec): boolean {
+    return this.pressed.has(p.group) === p.inverted;
+  }
+
+  /** The phase blocks that are currently solid, as collision rects. */
+  phaseSolids(): SolidRect[] {
+    return this.phase.filter((p) => this.isSolidPhase(p)).map((p) => ({ ...p.rect, id: PHASE_SOLID }));
   }
 
   private newRun(): Run {
@@ -178,6 +237,7 @@ export class World {
     this.runs = [];
     this.current = this.newRun();
     this.recordPlayer();
+    this.updateButtons();
   }
 
   boxStateAt(box: Box, t: number): BoxState {
@@ -185,7 +245,9 @@ export class World {
   }
 
   solids(): SolidRect[] {
-    return this.boxes.map((b) => ({ x: b.state.x, y: b.state.y, w: b.w, h: b.h, id: b.id }));
+    return this.boxes
+      .map((b) => ({ x: b.state.x, y: b.state.y, w: b.w, h: b.h, id: b.id }))
+      .concat(this.phaseSolids());
   }
 
   /**
@@ -221,6 +283,7 @@ export class World {
       const s = this.boxStateAt(box, this.now);
       box.state = { ...s };
     }
+    this.updateButtons();
     this.player.groundedOn = supportUnder(playerRect(this.player), this.map, this.solids());
   }
 
@@ -233,6 +296,7 @@ export class World {
 
   /** Advances the authoritative timeline by one tick and simulates the world into it. */
   step(input: Input): void {
+    this.updateButtons();
     const target = clamp(this.now + this.dir, 0, TICKS);
     const before = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
 
@@ -261,6 +325,7 @@ export class World {
    * would make the run's own ghost jump to the pad whenever time revisits it.
    */
   stepPlayerFrozen(input: Input): void {
+    this.updateButtons();
     this.stepPlayer(input);
   }
 
@@ -268,7 +333,7 @@ export class World {
     return this.boxes
       .filter((o) => o !== box)
       .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
-      .concat(this.deviceSolids);
+      .concat(this.deviceSolids, this.phaseSolids());
   }
 
   /**
@@ -334,6 +399,7 @@ export class World {
         ? this.boxes
             .filter((o) => o !== box && !o.immovable)
             .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
+            .concat(this.phaseSolids())
         : [...this.otherBoxSolids(box), ...ghosts];
       if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);

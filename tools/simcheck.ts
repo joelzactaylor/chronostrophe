@@ -3,7 +3,7 @@
  * scrubbing, reverse-time worldline replay and the "ride the rewinding box"
  * mechanic the level is built around. Run with `npm run check:sim`.
  */
-import { LevelDef, MONOLITH_RELEASE, buildLevel } from '../src/game/level';
+import { LevelDef, MONOLITH_RELEASE, buildLevel, button, phaseBlocks } from '../src/game/level';
 import { TileMap } from '../src/core/physics';
 import { NO_INPUT, World, playerRect } from '../src/core/world';
 import { Input } from '../src/core/world';
@@ -641,6 +641,79 @@ function levelWorld(level: LevelDef): World {
     Math.abs(stone.state.x - restX) < 0.5,
     `stone x=${stone.state.x} was ${restX}`,
   );
+}
+
+// 22. Push buttons: anything at all in one presses it, and the phase blocks follow.
+{
+  const rows: string[] = [];
+  for (let y = 0; y < 17; y++) {
+    let row = '';
+    for (let x = 0; x < 44; x++) row += y >= 15 || x === 0 || x === 43 ? '#' : '.';
+    rows.push(row);
+  }
+  const map = new TileMap(rows);
+  const gate = phaseBlocks(0, 20, 13, 20, 14);
+  const w = new World(
+    map,
+    { x: 2 * TILE, y: 15 * TILE - 28 },
+    [{ x: 8 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }],
+    [],
+    [button(6, 15, 0)],
+    gate,
+  );
+
+  run(w, 20);
+  check('a button with nothing in it is up', !w.isPressed(0));
+  check('its blocks are solid while it is up', w.phaseSolids().length === gate.length);
+
+  // Walk into the button: standing in it holds it down.
+  let pressedWhilePassing = false;
+  let openWhilePressed = true;
+  for (let i = 0; i < 90; i++) {
+    w.step({ ...NO_INPUT, right: true });
+    if (w.isPressed(0)) {
+      pressedWhilePassing = true;
+      openWhilePressed &&= w.phaseSolids().length === 0;
+    }
+  }
+  check('the live body presses the button', pressedWhilePassing, `x=${w.player.x}`);
+  check('the blocks go passable while it is held', openWhilePressed);
+
+  // ...and it is up again the moment the body leaves it: a button, not a switch.
+  run(w, 120, { ...NO_INPUT, right: true });
+  check('the button releases when nothing is in it', !w.isPressed(0), `x=${w.player.x}`);
+  check('the blocks are solid again', w.phaseSolids().length === gate.length);
+  check(
+    'the solid blocks stop the body',
+    w.player.x + 20 <= 20 * TILE + 1,
+    `x=${w.player.x}`,
+  );
+
+  // A crate shoved into the button holds it down with nobody there.
+  const crate = w.boxes[0];
+  crate.state.x = 6 * TILE + 2;
+  crate.state.y = 15 * TILE - 28;
+  w.updateButtons();
+  check('a crate left in a button presses it', w.isPressed(0), `crate x=${crate.state.x}`);
+}
+
+// 23. An inverted block is the complement: closed while the button is held.
+{
+  const rows: string[] = [];
+  for (let y = 0; y < 17; y++) rows.push(''.padEnd(44, y >= 15 ? '#' : '.'));
+  const w = new World(
+    new TileMap(rows),
+    { x: 2 * TILE, y: 15 * TILE - 28 },
+    [],
+    [],
+    [button(10, 15, 1)],
+    phaseBlocks(1, 20, 14, 20, 14, true),
+  );
+  run(w, 20);
+  check('an inverted block is open while its button is up', w.phaseSolids().length === 0);
+  w.player.x = 10 * TILE;
+  w.updateButtons();
+  check('an inverted block closes while its button is held', w.phaseSolids().length === 1);
 }
 
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);

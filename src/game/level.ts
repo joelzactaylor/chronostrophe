@@ -1,5 +1,5 @@
 import { TileMap } from '../core/physics';
-import { BoxSpec, PLAYER_H, PLAYER_W } from '../core/world';
+import { BoxSpec, ButtonSpec, PLAYER_H, PLAYER_W, PhaseSpec } from '../core/world';
 import { Rect, TILE, clamp } from '../core/types';
 
 export type DeviceKind = 'chronoporter' | 'anachroverter' | 'chronoclast';
@@ -21,6 +21,10 @@ export interface LevelDef {
   devices: Device[];
   hazards: Rect[];
   exit: { x: number; y: number; r: number };
+  /** Push buttons; anything resting in one holds it down. */
+  buttons?: ButtonSpec[];
+  /** Blocks that swap between solid and passable with a button's group. */
+  phase?: PhaseSpec[];
 }
 
 const COLS = 44;
@@ -48,6 +52,43 @@ function pad(kind: DeviceKind, cx: number, surfaceRow: number, label: string): D
     rect: { x: cx * TILE, y: surfaceRow * TILE - h, w: TILE, h },
     label,
   };
+}
+
+/** A button is a shallow plate: it is stood in, not on, and never collides. */
+export const BUTTON_H = 8;
+
+/**
+ * A push button on the floor of `surfaceRow`, one tile wide unless `tiles` says
+ * otherwise. Everything sharing a `group` number works the same blocks.
+ */
+export function button(cx: number, surfaceRow: number, group = 0, tiles = 1): ButtonSpec {
+  return {
+    rect: { x: cx * TILE, y: surfaceRow * TILE - BUTTON_H, w: tiles * TILE, h: BUTTON_H },
+    group,
+  };
+}
+
+/**
+ * A rectangle of phase blocks, in tile coordinates and inclusive of both corners.
+ * They are solid while the group's button is up and passable while it is held
+ * down; `inverted` blocks are the other way round, so one button can open one way
+ * through and close another.
+ */
+export function phaseBlocks(
+  group: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  inverted = false,
+): PhaseSpec[] {
+  const out: PhaseSpec[] = [];
+  for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+    for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+      out.push({ rect: { x: x * TILE, y: y * TILE, w: TILE, h: TILE }, group, inverted });
+    }
+  }
+  return out;
 }
 
 /** Tick at which the monolith of level 1 is let go. */

@@ -10,6 +10,9 @@ export const GROUND_GHOST = -3;
 /** A time device's volume: solid to objects, open to the live body. */
 export const DEVICE_SOLID = -4;
 
+/** A phase block while it is in its solid form. */
+export const PHASE_SOLID = -5;
+
 export interface Rect {
   x: number;
   y: number;

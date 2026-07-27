@@ -61,6 +61,8 @@ monolith(cx, R)                                 // the standard 4x3 stone, hung 
 pad('chronoporter'  , cx, surfaceRow, label)    // stand on it to scrub the timeline
 pad('anachroverter' , cx, surfaceRow, label)    // stand on it and press R to flip time's direction
 pad('chronoclast'   , cx, surfaceRow, label)    // erases your recorded history
+button(cx, surfaceRow, group, tiles = 1)        // a push button; anything in it holds it down
+phaseBlocks(group, x0, y0, x1, y1, inverted?)   // orange blocks that swap phase with that group
 hazards: [{ x, y, w, h }]                       // spikes: touching them kills
 exit:    { x, y, r }                            // the gate, as a centre and a radius
 ```
@@ -75,6 +77,35 @@ floor at row 15. A pad is a volume the player fits inside — one tile wide, `PL
 it is **solid to objects but open to the live body**, so crates stop against it and never
 settle in the space you have to stand in. A pad in a crate's path is therefore a wall for the crate:
 put pads where the crate does not have to travel.
+
+### Buttons and phase blocks
+
+```ts
+buttons: [button(18, 15, 0)],                     // group 0's button, on the floor at row 15
+phase: [
+  ...phaseBlocks(0, 24, 12, 24, 14),              // a wall that opens while the button is held
+  ...phaseBlocks(0, 30, 12, 30, 14, true),        // and one that closes at the same moment
+],
+```
+
+A button is **pressed while anything at all is resting in it** — the live body, a former self, a
+crate, a monolith — and **up again the instant nothing is**: it is a push button, not a switch, so
+holding a door open means leaving something in it. It is not solid; things stand *in* it, never on
+it, and it never blocks a crate or a body.
+
+Phase blocks are one tile each and share a `group` with their button. By default a block is solid
+while the button is up and passable while it is held; `inverted` reverses that, so one button can
+open one route and close another at the same time. Solid blocks are filled orange, phased-out ones
+are a dashed outline, and their state is derived from the world every tick rather than stored —
+scrub anywhere on the timeline and the blocks are in the phase that tick's world implies.
+
+Both forms are shared by everything: a phased-out block will not hold up a crate, and a block that
+goes solid under a monolith stops it exactly as a crate would. Some ideas the pair gives you:
+
+* a door held open only by a former self, so you have to spend a run standing on the button;
+* a crate whose only job is to be parked in a button;
+* a monolith that lands in a button and holds a route open for the rest of the level;
+* an inverted block that seals the way back the moment you press, making the run one-way.
 
 ## Designing with the timeline
 

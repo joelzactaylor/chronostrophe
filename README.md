@@ -57,6 +57,14 @@ Writing your own levels: [docs/AUTHORING.md](docs/AUTHORING.md).
 Reaching a gate advances to the next level with `ENTER`. Every level is unlocked from the start:
 the menu is the first thing the game shows, and `ESC` returns to it.
 
+## Buttons
+
+A button is pressed while anything is resting in it — you, a former self, a crate, a monolith — and
+released the moment nothing is; it is never solid. Its group's orange phase blocks are solid while
+it is up and passable while it is held (or the reverse, for blocks declared `inverted`). Both states
+apply to everything in the world, so a phased-out block holds nothing up and a block that goes solid
+under a falling stone stops it. See [docs/AUTHORING.md](docs/AUTHORING.md).
+
 ## Devices
 
 | device | behaviour |

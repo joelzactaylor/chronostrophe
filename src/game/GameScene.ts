@@ -54,6 +54,7 @@ const COL_GHOST = 0x76d9ff;
 const COL_BOX = 0xd98b45;
 const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
+const COL_PHASE = 0xff9d3d;
 
 /** Blends two packed colours, for light that reddens as it is dragged down. */
 function mixColor(from: number, to: number, k: number): number {
@@ -112,6 +113,8 @@ export class GameScene extends Phaser.Scene {
       this.level.spawn,
       this.level.boxes,
       this.level.devices.map((d) => d.rect),
+      this.level.buttons ?? [],
+      this.level.phase ?? [],
     );
     this.state = 'play';
     this.message = '';
@@ -594,6 +597,8 @@ export class GameScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     this.drawTiles(g);
+    this.drawPhaseBlocks(g);
+    this.drawButtons(g);
     this.drawHazards(g);
     this.drawExit(g);
     for (const box of this.world.boxes) this.drawBox(g, box);
@@ -618,6 +623,43 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(0x1a1233, 1).fillRect(x + 2, y + 6, TILE - 4, TILE - 8);
         if (!map.isSolid(cx, cy - 1)) g.fillStyle(COL_TILE_EDGE, 1).fillRect(x, y, TILE, 4);
       }
+    }
+  }
+
+  /**
+   * Orange blocks in one of their two forms: filled and edged while solid, a dim
+   * dashed outline while they are only the memory of a wall.
+   */
+  private drawPhaseBlocks(g: Phaser.GameObjects.Graphics): void {
+    for (const p of this.world.phase) {
+      const r = p.rect;
+      if (this.world.isSolidPhase(p)) {
+        g.fillStyle(0x8a4a12, 1).fillRect(r.x, r.y, r.w, r.h);
+        g.fillStyle(COL_PHASE, 1).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+        g.lineStyle(1, 0xffd7a1, 0.5).strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      } else {
+        g.fillStyle(COL_PHASE, 0.07).fillRect(r.x, r.y, r.w, r.h);
+        g.lineStyle(1, COL_PHASE, 0.45);
+        for (let x = r.x + 3; x < r.x + r.w; x += 8) g.lineBetween(x, r.y + 1, x, r.y + 4);
+        for (let x = r.x + 3; x < r.x + r.w; x += 8) g.lineBetween(x, r.y + r.h - 4, x, r.y + r.h - 1);
+        for (let y = r.y + 3; y < r.y + r.h; y += 8) g.lineBetween(r.x + 1, y, r.x + 4, y);
+        for (let y = r.y + 3; y < r.y + r.h; y += 8) g.lineBetween(r.x + r.w - 4, y, r.x + r.w - 1, y);
+      }
+    }
+  }
+
+  /** A plate that sinks while it is held down: the whole of its state is its height. */
+  private drawButtons(g: Phaser.GameObjects.Graphics): void {
+    for (const b of this.world.buttons) {
+      const r = b.rect;
+      const down = this.world.isPressed(b.group);
+      const lift = down ? 2 : 6;
+      g.fillStyle(0x1a1233, 1).fillRect(r.x, r.y + r.h - 3, r.w, 3);
+      g.fillStyle(down ? 0xffb066 : COL_PHASE, down ? 1 : 0.85);
+      g.fillRect(r.x + 2, r.y + r.h - lift, r.w - 4, lift - 1);
+      g.lineStyle(1, 0xffd7a1, down ? 0.9 : 0.4);
+      g.strokeRect(r.x + 2, r.y + r.h - lift, r.w - 4, lift - 1);
+      if (down) g.fillStyle(COL_PHASE, 0.18).fillRect(r.x, r.y - 6, r.w, r.h + 6);
     }
   }
 
