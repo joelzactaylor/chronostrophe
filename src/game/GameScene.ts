@@ -5,6 +5,7 @@ import { Device, LEVELS, LevelDef, buildLevel } from './level';
 import { FISHEYE_KEY, FisheyePipeline } from './fisheye';
 import { fadeIn, fadeOutThen } from './transition';
 import { sfx } from './audio';
+import { groupColour, mixColor, shade, tint } from './palette';
 
 export type GameState = 'play' | 'death' | 'dust' | 'fisheye' | 'won';
 
@@ -30,7 +31,7 @@ export interface Anomaly {
 }
 
 /** Lived steps the anomaly covers per tick: the consequence outruns its cause. */
-const ANOMALY_SPEED = 2;
+const ANOMALY_SPEED = 3;
 
 /** How long the gate takes to swallow the body, in ms: a moment, not a cutscene. */
 const CAPTURE_MS = 850;
@@ -54,17 +55,6 @@ const COL_GHOST = 0x76d9ff;
 const COL_BOX = 0xd98b45;
 const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
-const COL_PHASE = 0xff9d3d;
-
-/** Blends two packed colours, for light that reddens as it is dragged down. */
-function mixColor(from: number, to: number, k: number): number {
-  const mix = (shift: number): number => {
-    const a = (from >> shift) & 0xff;
-    const b = (to >> shift) & 0xff;
-    return Math.round(a + (b - a) * k) << shift;
-  };
-  return mix(16) | mix(8) | mix(0);
-}
 
 export const VIEW_W = 960;
 export const VIEW_H = 544;
@@ -637,19 +627,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Orange blocks in one of their two forms: filled and edged while solid, a dim
-   * dashed outline while they are only the memory of a wall.
+   * A block in one of its two forms: filled and edged while solid, a dim dashed
+   * outline while it is only the memory of a wall. It wears the colour of the
+   * button that works it, so which button opens which way through is read off the
+   * screen rather than remembered.
    */
   private drawPhaseBlocks(g: Phaser.GameObjects.Graphics): void {
     for (const p of this.world.phase) {
       const r = p.rect;
+      const c = groupColour(p.group);
       if (this.world.isSolidPhase(p)) {
-        g.fillStyle(0x8a4a12, 1).fillRect(r.x, r.y, r.w, r.h);
-        g.fillStyle(COL_PHASE, 1).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
-        g.lineStyle(1, 0xffd7a1, 0.5).strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+        g.fillStyle(shade(c, 0.6), 1).fillRect(r.x, r.y, r.w, r.h);
+        g.fillStyle(c, 1).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+        g.lineStyle(1, tint(c, 0.6), 0.5).strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
       } else {
-        g.fillStyle(COL_PHASE, 0.07).fillRect(r.x, r.y, r.w, r.h);
-        g.lineStyle(1, COL_PHASE, 0.45);
+        g.fillStyle(c, 0.07).fillRect(r.x, r.y, r.w, r.h);
+        g.lineStyle(1, c, 0.45);
         for (let x = r.x + 3; x < r.x + r.w; x += 8) g.lineBetween(x, r.y + 1, x, r.y + 4);
         for (let x = r.x + 3; x < r.x + r.w; x += 8) g.lineBetween(x, r.y + r.h - 4, x, r.y + r.h - 1);
         for (let y = r.y + 3; y < r.y + r.h; y += 8) g.lineBetween(r.x + 1, y, r.x + 4, y);
@@ -658,18 +651,26 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** A plate that sinks while it is held down: the whole of its state is its height. */
+  /**
+   * A plate in a socket that sinks while it is held down. Deliberately squat and
+   * mechanical: a device is a tall lit volume you stand inside, and nothing about
+   * a button should read that way.
+   */
   private drawButtons(g: Phaser.GameObjects.Graphics): void {
     for (const b of this.world.buttons) {
       const r = b.rect;
+      const c = groupColour(b.group);
       const down = this.world.isPressed(b.group);
       const lift = down ? 2 : 6;
-      g.fillStyle(0x1a1233, 1).fillRect(r.x, r.y + r.h - 3, r.w, 3);
-      g.fillStyle(down ? 0xffb066 : COL_PHASE, down ? 1 : 0.85);
-      g.fillRect(r.x + 2, r.y + r.h - lift, r.w - 4, lift - 1);
-      g.lineStyle(1, 0xffd7a1, down ? 0.9 : 0.4);
-      g.strokeRect(r.x + 2, r.y + r.h - lift, r.w - 4, lift - 1);
-      if (down) g.fillStyle(COL_PHASE, 0.18).fillRect(r.x, r.y - 6, r.w, r.h + 6);
+      const top = r.y + r.h - lift;
+      // The socket it sits in, wider than the plate and dark.
+      g.fillStyle(0x120c26, 1).fillRect(r.x - 2, r.y + r.h - 4, r.w + 4, 4);
+      g.fillStyle(shade(c, 0.7), 1).fillRect(r.x - 2, r.y + r.h - 4, r.w + 4, 1);
+      // The plate, and the shoulders it rides between.
+      g.fillStyle(down ? tint(c, 0.35) : c, down ? 1 : 0.85).fillRect(r.x + 3, top, r.w - 6, lift - 1);
+      g.fillStyle(shade(c, 0.55), 1).fillRect(r.x + 1, r.y + r.h - 7, 2, 7);
+      g.fillStyle(shade(c, 0.55), 1).fillRect(r.x + r.w - 3, r.y + r.h - 7, 2, 7);
+      if (down) g.fillStyle(c, 0.35).fillRect(r.x + 3, top - 1, r.w - 6, 1);
     }
   }
 
@@ -850,5 +851,37 @@ export class GameScene extends Phaser.Scene {
     const slip = 2 + 3 * pulse;
     g.lineStyle(1, COL_ANOMALY, 0.18 + 0.22 * pulse).strokeRect(r.x - slip, r.y + slip, r.w, r.h);
     g.lineStyle(1, COL_GHOST, 0.12 + 0.2 * pulse).strokeRect(r.x + slip, r.y - slip, r.w, r.h);
+    this.drawFizzle(g, r, urgency);
+  }
+
+  /**
+   * The body coming apart: it is being held in a time that is not its own, so it
+   * tears into scanlines and throws off sparks, harder the closer it gets.
+   */
+  private drawFizzle(g: Phaser.GameObjects.Graphics, r: Rect, urgency: number): void {
+    const t = this.time.now;
+    const rand = (n: number): number => {
+      const v = Math.sin(n * 12.9898 + Math.floor(t / 55) * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    // Slices of the body slid sideways, as if its history were mistracking.
+    const slices = 3 + Math.round(urgency * 3);
+    for (let i = 0; i < slices; i++) {
+      const y = r.y + rand(i) * (r.h - 3);
+      const h = 1 + rand(i + 40) * 2;
+      const dx = (rand(i + 80) - 0.5) * (6 + urgency * 10);
+      g.fillStyle(rand(i + 120) > 0.5 ? COL_ANOMALY : COL_GHOST, 0.35 + 0.4 * urgency);
+      g.fillRect(r.x + dx, y, r.w, h);
+    }
+    // Sparks shed into the space around it, drifting up out of the tear.
+    const sparks = 5 + Math.round(urgency * 7);
+    for (let i = 0; i < sparks; i++) {
+      const life = ((t / 380 + rand(i + 200)) % 1);
+      const x = r.x + rand(i + 240) * r.w + (rand(i + 280) - 0.5) * 10;
+      const y = r.y + r.h * rand(i + 320) - life * (10 + urgency * 16);
+      const size = 1 + rand(i + 360) * 1.6;
+      g.fillStyle(COL_ANOMALY, (1 - life) * (0.35 + 0.45 * urgency));
+      g.fillRect(x, y, size, size);
+    }
   }
 }

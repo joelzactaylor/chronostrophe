@@ -5,6 +5,7 @@ import { VIEW_H, VIEW_W } from './GameScene';
 import { TILE } from '../core/types';
 import { fadeIn, fadeOutThen } from './transition';
 import { sfx } from './audio';
+import { GROUP_COLOURS, groupColour, shade } from './palette';
 
 type Tool =
   | 'wall'
@@ -36,8 +37,6 @@ const TOOLS: { tool: Tool; key: string; label: string }[] = [
   { tool: 'phase', key: 'P', label: 'PHASE' },
   { tool: 'phaseInv', key: 'O', label: 'PHASE-INV' },
 ];
-
-const GROUP_COLOURS = [0xff9d3d, 0x76d9ff, 0x9dff6b, 0xff6bd6];
 
 const UI_H = 96;
 const MAP_W = COLS * TILE;
@@ -293,7 +292,7 @@ export class EditorScene extends Phaser.Scene {
     }
 
     for (const p of d.phase) {
-      const c = GROUP_COLOURS[p.group % GROUP_COLOURS.length];
+      const c = groupColour(p.group);
       if (p.inverted) {
         g.fillStyle(c, 0.12).fillRect(p.cx * TILE, p.cy * TILE, TILE, TILE);
         g.lineStyle(2, c, 0.8).strokeRect(p.cx * TILE + 2, p.cy * TILE + 2, TILE - 4, TILE - 4);
@@ -303,9 +302,11 @@ export class EditorScene extends Phaser.Scene {
     }
 
     for (const b of d.buttons) {
-      const c = GROUP_COLOURS[b.group % GROUP_COLOURS.length];
-      g.fillStyle(c, 0.9).fillRect(b.cx * TILE + 3, b.row * TILE - 7, TILE - 6, 6);
-      g.fillStyle(c, 0.15).fillRect(b.cx * TILE, b.row * TILE - 20, TILE, 20);
+      const c = groupColour(b.group);
+      g.fillStyle(0x120c26, 1).fillRect(b.cx * TILE - 2, b.row * TILE - 4, TILE + 4, 4);
+      g.fillStyle(c, 0.9).fillRect(b.cx * TILE + 3, b.row * TILE - 7, TILE - 6, 5);
+      g.fillStyle(shade(c, 0.55), 1).fillRect(b.cx * TILE + 1, b.row * TILE - 7, 2, 7);
+      g.fillStyle(shade(c, 0.55), 1).fillRect(b.cx * TILE + TILE - 3, b.row * TILE - 7, 2, 7);
     }
 
     for (const h of d.hazards) {
@@ -356,7 +357,7 @@ export class EditorScene extends Phaser.Scene {
       g.fillStyle(0x6d4bd6, on ? 0.3 : 0.06).fillRect(x, y, 130, 17);
       this.toolTexts[i].setColor(on ? '#ffffff' : '#cfd8ff');
     });
-    const c = GROUP_COLOURS[this.group];
+    const c = groupColour(this.group);
     g.fillStyle(c, 0.9).fillRect(VIEW_W - 26, 8, 14, 14);
     this.status.setText(
       `${this.draft.name.toUpperCase()}   [F2] rename   [G] group ${this.group}   ` +
