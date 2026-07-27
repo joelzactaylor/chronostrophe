@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
-import { PlayerState, Rect, TILE, clamp, rectsOverlap } from '../core/types';
-import { Box, Input, World, boxRect, playerRect } from '../core/world';
+import { GROUND_NONE, PlayerState, Rect, TILE, clamp, rectsOverlap } from '../core/types';
+import { Box, Input, PLAYER_H, PLAYER_W, World, boxRect, playerRect } from '../core/world';
 import { Device, LEVELS, LevelDef, buildLevel } from './level';
 import { FISHEYE_KEY, FisheyePipeline } from './fisheye';
+import { fadeIn, fadeOutThen } from './transition';
+import { sfx } from './audio';
 
 export type GameState = 'play' | 'death' | 'dust' | 'fisheye' | 'won';
 
@@ -30,6 +32,17 @@ export interface Anomaly {
 /** Lived steps the anomaly covers per tick: the consequence outruns its cause. */
 const ANOMALY_SPEED = 2;
 
+/** How long the gate takes to swallow the body, in ms. */
+const CAPTURE_MS = 2100;
+
+/** The body's inspiral into the gate, from the moment it touches the horizon. */
+interface Capture {
+  t: number;
+  /** Where it entered, as a polar offset from the gate's centre. */
+  r0: number;
+  a0: number;
+}
+
 /** Ticks of immunity after a restart or a timeline edit before history is judged again. */
 const PARADOX_GRACE = 5;
 
@@ -41,6 +54,16 @@ const COL_GHOST = 0x76d9ff;
 const COL_BOX = 0xd98b45;
 const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
+
+/** Blends two packed colours, for light that reddens as it is dragged down. */
+function mixColor(from: number, to: number, k: number): number {
+  const mix = (shift: number): number => {
+    const a = (from >> shift) & 0xff;
+    const b = (to >> shift) & 0xff;
+    return Math.round(a + (b - a) * k) << shift;
+  };
+  return mix(16) | mix(8) | mix(0);
+}
 
 export const VIEW_W = 960;
 export const VIEW_H = 544;
@@ -62,6 +85,7 @@ export class GameScene extends Phaser.Scene {
 
   private gfx!: Phaser.GameObjects.Graphics;
   private bg!: Phaser.GameObjects.Graphics;
+  private vignette!: Phaser.GameObjects.Graphics;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private jumpQueued = false;
   private acc = 0;
@@ -69,6 +93,8 @@ export class GameScene extends Phaser.Scene {
   private lastClast: Device | null = null;
   private effectT = 0;
   private fisheye: FisheyePipeline | null = null;
+  private capture: Capture | null = null;
+  private lastBeat = 0;
   private dust: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
   constructor() {
@@ -97,6 +123,7 @@ export class GameScene extends Phaser.Scene {
     this.jumpQueued = false;
     this.activeDevice = null;
     this.lastClast = null;
+    this.capture = null;
 
     const g = this.make.graphics({ x: 0, y: 0 });
     g.fillStyle(0xffffff, 1).fillRect(0, 0, 4, 4);
@@ -108,6 +135,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.level.map.widthPx, this.level.map.heightPx);
     this.cameras.main.setAlpha(1);
     this.cameras.main.setZoom(1);
+    fadeIn(this);
     this.followTarget.x = this.level.spawn.x;
     this.followTarget.y = this.level.spawn.y;
     this.cameras.main.startFollow(this.followTarget, true, 0.12, 0.12);
@@ -115,20 +143,26 @@ export class GameScene extends Phaser.Scene {
     this.bg = this.add.graphics().setScrollFactor(0.25).setDepth(-10);
     this.drawBackdrop();
     this.gfx = this.add.graphics().setDepth(0);
+    this.vignette = this.add.graphics().setScrollFactor(0).setDepth(20);
+    this.drawVignette();
 
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys(
-      'LEFT,RIGHT,UP,DOWN,A,D,W,S,SPACE,R,K,ESC,ENTER',
+      'LEFT,RIGHT,UP,DOWN,A,D,W,S,SPACE,R,K,M,ESC,ENTER',
     ) as Record<string, Phaser.Input.Keyboard.Key>;
     kb.on('keydown-SPACE', () => (this.jumpQueued = true));
     kb.on('keydown-UP', () => (this.jumpQueued = true));
     kb.on('keydown-W', () => (this.jumpQueued = true));
     kb.on('keydown-R', () => this.onReversePressed());
     kb.on('keydown-K', () => this.abandonRun());
+    kb.on('keydown-M', () => sfx.toggleMute());
+    kb.on('keydown', () => sfx.unlock());
+    this.input.on('pointerdown', () => sfx.unlock());
     kb.on('keydown-ESC', () => this.openMenu());
     kb.on('keydown-ENTER', () => {
-      if (this.state !== 'won') return;
-      this.scene.restart({ level: this.hasNextLevel ? this.levelIndex + 1 : 0 });
+      if (this.state !== 'won' || !this.captureDone) return;
+      const next = this.hasNextLevel ? this.levelIndex + 1 : 0;
+      fadeOutThen(this, 220, () => this.scene.restart({ level: next }));
     });
 
     if (!this.scene.isActive('hud')) this.scene.launch('hud');
@@ -163,11 +197,14 @@ export class GameScene extends Phaser.Scene {
     if (this.activeDevice?.kind !== 'anachroverter') return;
     this.world.dir = this.world.dir === 1 ? -1 : 1;
     this.message = `TIME DIRECTION: ${this.world.dir === 1 ? 'FORWARD' : 'BACKWARD'}`;
+    sfx.reverse();
   }
 
   openMenu(): void {
-    this.scene.stop('hud');
-    this.scene.start('menu');
+    fadeOutThen(this, 200, () => {
+      this.scene.stop('hud');
+      this.scene.start('menu');
+    });
   }
 
   /**
@@ -177,12 +214,13 @@ export class GameScene extends Phaser.Scene {
    */
   abandonRun(): void {
     if (this.state === 'play') this.fail('death', 'RUN ABANDONED');
-    else this.scene.restart({ level: this.levelIndex });
+    else fadeOutThen(this, 200, () => this.scene.restart({ level: this.levelIndex }));
   }
 
   /** Called by the HUD while the player scrubs the slider on a chronoporter. */
   scrub(t: number): void {
     if (!this.canScrub()) return;
+    if (t !== this.world.now) sfx.scrubTick();
     this.world.scrubTo(t);
   }
 
@@ -217,12 +255,50 @@ export class GameScene extends Phaser.Scene {
 
     this.followTarget.x = this.world.player.x + 10;
     this.followTarget.y = this.world.player.y + 14;
+    this.beatForAnomalies();
     this.render();
+  }
+
+  /** A heartbeat while an anomaly is on your path, quicker the closer it is. */
+  private beatForAnomalies(): void {
+    const lead = this.anomalyLead();
+    if (lead === null) return;
+    const period = 260 + Math.min(lead, 300) * 2.2;
+    if (this.time.now - this.lastBeat < period) return;
+    this.lastBeat = this.time.now;
+    sfx.anomalyBeat();
   }
 
   private followTarget = { x: 0, y: 0 };
 
   private tick(input: Input): void {
+    const world = this.world;
+    const before = {
+      grounded: world.player.groundedOn !== GROUND_NONE,
+      boxX: world.boxes.map((b) => b.state.x),
+      stoneV: world.boxes.map((b) => b.state.vy),
+    };
+    this.tickBody(input);
+    this.soundFor(before);
+  }
+
+  /** Whatever the tick did that is worth hearing. */
+  private soundFor(before: { grounded: boolean; boxX: number[]; stoneV: number[] }): void {
+    const world = this.world;
+    const p = world.player;
+    const grounded = p.groundedOn !== GROUND_NONE;
+    if (before.grounded && !grounded && p.vy < -100) sfx.jump();
+    else if (!before.grounded && grounded) sfx.land();
+    world.boxes.forEach((b, i) => {
+      if (b.immovable) {
+        if (before.stoneV[i] > 300 && b.state.vy === 0) sfx.impact();
+      } else if (Math.abs(b.state.x - before.boxX[i]) > 0.4 && grounded) {
+        sfx.push();
+      }
+    });
+  }
+
+  private tickBody(input: Input): void {
     const world = this.world;
     if (world.paused) {
       // Timeline frozen on a device: the live body still moves, history does not.
@@ -250,6 +326,7 @@ export class GameScene extends Phaser.Scene {
         this.lastParadoxReason = paradox.reason;
         this.spawnAnomaly(paradox.run.id, paradox.tick);
         world.removeRun(paradox.run);
+        sfx.paradox();
         this.message = `PARADOX — ${paradox.reason.toUpperCase()}`;
       }
     }
@@ -273,6 +350,7 @@ export class GameScene extends Phaser.Scene {
     if (rectsOverlap(pr, { x: ex.x - ex.r, y: ex.y - ex.r, w: ex.r * 2, h: ex.r * 2 })) {
       this.state = 'won';
       this.message = 'TIMELINE RESOLVED';
+      this.beginCapture();
       return;
     }
     if (world.atTimeBound()) {
@@ -304,6 +382,7 @@ export class GameScene extends Phaser.Scene {
       this.activeDevice = found;
       world.paused = true;
       this.message = '';
+      sfx.device();
     } else if (!pausing && this.activeDevice) {
       // Stepping off a pausing pad always closes the recording segment: the body
       // moved while the timeline stood still, so what follows is a new worldline.
@@ -343,7 +422,7 @@ export class GameScene extends Phaser.Scene {
   deviceHint(): string | null {
     const d = this.activeDevice;
     if (!d) return null;
-    return d.kind === 'anachroverter' ? `${d.label} — [R] reverses time` : `${d.label} — drag the slider`;
+    return d.kind === 'anachroverter' ? `${d.label} — [R] reverses time` : `${d.label} — drag the slider to advance time`;
   }
 
   /** Lived steps between the nearest anomaly and the present, or null if there is none. */
@@ -365,8 +444,15 @@ export class GameScene extends Phaser.Scene {
     this.message = why;
     this.effectT = 0;
     this.cameras.main.stopFollow();
-    if (kind === 'dust') this.emitDust();
-    if (kind === 'death') this.emitDust(this.world.player.x, this.world.player.y, 60);
+    if (kind === 'dust') {
+      this.emitDust();
+      sfx.dust();
+    }
+    if (kind === 'death') {
+      this.emitDust(this.world.player.x, this.world.player.y, 60);
+      sfx.death();
+    }
+    if (kind === 'fisheye') sfx.collapse();
   }
 
   private emitDust(x?: number, y?: number, count = 700): void {
@@ -391,8 +477,65 @@ export class GameScene extends Phaser.Scene {
     this.dust.explode(count);
   }
 
+  // ---------------------------------------------------------------- the gate
+
+  private beginCapture(): void {
+    const e = this.level.exit;
+    const p = this.world.player;
+    const dx = p.x + PLAYER_W / 2 - e.x;
+    const dy = p.y + PLAYER_H / 2 - e.y;
+    this.capture = { t: 0, r0: Math.max(18, Math.hypot(dx, dy)), a0: Math.atan2(dy, dx) };
+    sfx.capture();
+    this.effectT = 0;
+    this.cameras.main.stopFollow();
+  }
+
+  /** True once the gate has finished swallowing the body. */
+  get captureDone(): boolean {
+    return this.capture === null || this.capture.t >= CAPTURE_MS;
+  }
+
+  /**
+   * The inspiral. Orbital speed rises as the radius falls, so the last turns are
+   * the fast ones; the body is stretched along its path and squeezed across it as
+   * the difference in pull between its head and its feet grows, and the light
+   * leaving it is dragged redder and dimmer the deeper it goes.
+   */
+  private captureFrame(): { x: number; y: number; angle: number; long: number; thin: number; k: number } {
+    const c = this.capture!;
+    const e = this.level.exit;
+    const k = clamp(c.t / CAPTURE_MS, 0, 1);
+    // Radius falls away steeply at the end rather than linearly.
+    const r = c.r0 * Math.pow(1 - k, 1.7);
+    // Keplerian-ish: the closer it gets, the faster it goes round.
+    const swept = 5.2 * (Math.pow(c.r0 / Math.max(r, 4), 0.5) - 1);
+    const angle = c.a0 + Math.min(swept, 14);
+    const tide = Math.pow(k, 2.2);
+    return {
+      x: e.x + Math.cos(angle) * r,
+      y: e.y + Math.sin(angle) * r,
+      angle,
+      long: PLAYER_H * (1 + tide * 7),
+      thin: PLAYER_W * (1 - tide * 0.86),
+      k,
+    };
+  }
+
   private runFailEffects(delta: number): void {
     this.effectT += delta;
+    if (this.state === 'won' && this.capture) {
+      this.capture.t += delta;
+      const { k } = this.captureFrame();
+      const cam = this.cameras.main;
+      cam.scrollX += (this.level.exit.x - VIEW_W / 2 - cam.scrollX) * 0.06;
+      cam.scrollY += (this.level.exit.y - VIEW_H / 2 - cam.scrollY) * 0.06;
+      cam.setZoom(1 + k * 0.22);
+      // A little lensing, not the collapse the fisheye death uses.
+      if (this.fisheye) {
+        this.fisheye.amount = k * 0.22;
+        this.fisheye.chroma = k * 0.25;
+      }
+    }
     if (this.state === 'fisheye' && this.fisheye) {
       const k = clamp(this.effectT / 1400, 0, 1);
       this.fisheye.amount = k * 0.85;
@@ -404,15 +547,35 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.setAlpha(clamp(1 - this.effectT / 2200, 0, 1));
     }
     if (this.state !== 'won' && this.effectT > (this.state === 'death' ? 1100 : 2100)) {
-      this.scene.restart({ level: this.levelIndex });
+      fadeOutThen(this, 240, () => this.scene.restart({ level: this.levelIndex }));
     }
   }
 
   // ---------------------------------------------------------------- render
 
+  /** Corners pulled down, so the eye sits in the middle of the run. */
+  private drawVignette(): void {
+    const g = this.vignette;
+    g.clear();
+    for (let i = 0; i < 22; i++) {
+      const k = i / 22;
+      g.lineStyle(6, 0x05030a, 0.035 + k * 0.05);
+      g.strokeRect(3 * i, 3 * i, VIEW_W - 6 * i, VIEW_H - 6 * i);
+    }
+  }
+
   private drawBackdrop(): void {
     const g = this.bg;
     g.clear();
+    // A little depth behind the stars: slow, dim clouds of nothing much.
+    for (let i = 0; i < 5; i++) {
+      const x = 200 + i * 430;
+      const y = 90 + (i % 3) * 150;
+      for (let r = 6; r >= 1; r--) {
+        g.fillStyle(i % 2 === 0 ? 0x2b1d55 : 0x1b2a55, 0.02);
+        g.fillCircle(x, y, r * 26);
+      }
+    }
     for (let i = 0; i < 90; i++) {
       const x = (i * 137) % (this.level.map.widthPx + 400);
       const y = (i * 271) % this.level.map.heightPx;
@@ -436,7 +599,8 @@ export class GameScene extends Phaser.Scene {
     this.drawDevices(g);
     for (const { state } of this.world.ghostsAt(this.world.now)) this.drawGhost(g, state);
     for (const s of this.anomalySteps()) this.drawAnomaly(g, s);
-    if (this.state !== 'death' && this.state !== 'dust') this.drawPlayer(g);
+    if (this.state === 'won' && this.capture) this.drawCapturedBody(g);
+    else if (this.state !== 'death' && this.state !== 'dust') this.drawPlayer(g);
   }
 
   private drawTiles(g: Phaser.GameObjects.Graphics): void {
@@ -584,10 +748,53 @@ export class GameScene extends Phaser.Scene {
   private drawPlayer(g: Phaser.GameObjects.Graphics): void {
     const p = this.world.player;
     const r = playerRect(p);
+    // Where the body meets the floor, so a jump reads as height.
+    const floorY = this.restRowUnder(r);
+    const drop = clamp((floorY - (r.y + r.h)) / 140, 0, 1);
+    if (floorY < this.level.map.heightPx) {
+      g.fillStyle(0x05030a, 0.4 * (1 - drop));
+      g.fillEllipse(r.x + r.w / 2, floorY + 1, r.w * (1.1 - drop * 0.5), 6);
+    }
     const pulse = 0.35 + 0.15 * Math.sin(this.time.now / 160);
     g.lineStyle(3, COL_PLAYER, pulse).strokeRect(r.x - 5, r.y - 5, r.w + 10, r.h + 10);
     this.drawBody(g, p, COL_PLAYER, 1);
     g.fillStyle(0xffffff, 0.9).fillRect(r.x + r.w / 2 - 2, r.y - 12, 4, 6);
+  }
+
+  /**
+   * The body on its way in: a streak wound round the gate, drawn as an oriented
+   * quad with a few trailing after-images of where it was a moment ago.
+   */
+  private drawCapturedBody(g: Phaser.GameObjects.Graphics): void {
+    const c = this.capture!;
+    const t0 = c.t;
+    for (let i = 4; i >= 0; i--) {
+      c.t = Math.max(0, t0 - i * 55);
+      const f = this.captureFrame();
+      // Redshifted: yellow through orange to a dim red as it falls in.
+      const col = i === 0 ? mixColor(COL_PLAYER, COL_ANOMALY, f.k) : COL_ANOMALY;
+      const alpha = (i === 0 ? 1 : 0.22) * (1 - f.k * 0.85);
+      const cos = Math.cos(f.angle + Math.PI / 2);
+      const sin = Math.sin(f.angle + Math.PI / 2);
+      const hl = f.long / 2;
+      const ht = f.thin / 2;
+      g.fillStyle(col, alpha);
+      g.fillPoints(
+        [
+          new Phaser.Geom.Point(f.x + cos * hl - sin * ht, f.y + sin * hl + cos * ht),
+          new Phaser.Geom.Point(f.x + cos * hl + sin * ht, f.y + sin * hl - cos * ht),
+          new Phaser.Geom.Point(f.x - cos * hl + sin * ht, f.y - sin * hl - cos * ht),
+          new Phaser.Geom.Point(f.x - cos * hl - sin * ht, f.y - sin * hl + cos * ht),
+        ],
+        true,
+      );
+    }
+    c.t = t0;
+    const f = this.captureFrame();
+    // The gate answers: the ring brightens as it takes the mass.
+    const e = this.level.exit;
+    g.lineStyle(2, 0xd6b3ff, 0.5 * (1 - f.k)).strokeCircle(e.x, e.y, e.r * (1.4 - 0.3 * f.k));
+    g.fillStyle(0xffffff, 0.35 * f.k * f.k).fillCircle(e.x, e.y, e.r * 0.72);
   }
 
   private drawGhost(g: Phaser.GameObjects.Graphics, s: PlayerState): void {

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TICKS, clamp } from '../core/types';
 import { GameScene, VIEW_H, VIEW_W } from './GameScene';
+import { sfx } from './audio';
 
 const TRACK_X = 120;
 const TRACK_W = VIEW_W - 200;
@@ -12,6 +13,7 @@ type Button = { x: number; y: number; w: number; h: number };
 /** "Give up on this run": the way out of a level that has walled itself off. */
 const ABANDON: Button = { x: VIEW_W - 132, y: VIEW_H + 8, w: 116, h: 24 };
 const MENU: Button = { x: VIEW_W - 226, y: VIEW_H + 8, w: 86, h: 24 };
+const SOUND: Button = { x: VIEW_W - 300, y: VIEW_H + 8, w: 66, h: 24 };
 
 function hit(b: Button, p: Phaser.Input.Pointer): boolean {
   return p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h;
@@ -26,6 +28,7 @@ export class HudScene extends Phaser.Scene {
   private hint!: Phaser.GameObjects.Text;
   private abandon!: Phaser.GameObjects.Text;
   private menu!: Phaser.GameObjects.Text;
+  private soundBtn!: Phaser.GameObjects.Text;
   private anomaly!: Phaser.GameObjects.Text;
   private dragging = false;
 
@@ -76,6 +79,14 @@ export class HudScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    this.soundBtn = this.add
+      .text(SOUND.x + SOUND.w / 2, SOUND.y + SOUND.h / 2, '', {
+        ...font,
+        fontSize: '12px',
+        color: '#b9c3ea',
+      })
+      .setOrigin(0.5);
+
     this.anomaly = this.add
       .text(VIEW_W / 2, VIEW_H - 34, '', {
         ...font,
@@ -87,6 +98,11 @@ export class HudScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (hit(ABANDON, p)) {
         this.game_.abandonRun();
+        return;
+      }
+      if (hit(SOUND, p)) {
+        sfx.unlock();
+        sfx.toggleMute();
         return;
       }
       if (hit(MENU, p)) {
@@ -131,6 +147,12 @@ export class HudScene extends Phaser.Scene {
     g.fillStyle(0xf43f5e, overAbandon ? 0.28 : 0.14).fillRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
     g.lineStyle(1, 0xf43f5e, overAbandon ? 0.9 : 0.55).strokeRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
     this.abandon.setColor(overAbandon ? '#ffffff' : '#ffb3c1');
+
+    const overSound = hit(SOUND, p);
+    g.fillStyle(0x6d4bd6, overSound ? 0.3 : 0.14).fillRect(SOUND.x, SOUND.y, SOUND.w, SOUND.h);
+    g.lineStyle(1, 0x6d4bd6, overSound ? 0.9 : 0.55).strokeRect(SOUND.x, SOUND.y, SOUND.w, SOUND.h);
+    this.soundBtn.setText(sfx.isMuted ? 'MUTED [M]' : 'SOUND [M]');
+    this.soundBtn.setColor(sfx.isMuted ? '#8892bd' : overSound ? '#ffffff' : '#b9c3ea');
 
     const overMenu = hit(MENU, p);
     g.fillStyle(0x6d4bd6, overMenu ? 0.3 : 0.14).fillRect(MENU.x, MENU.y, MENU.w, MENU.h);
@@ -204,11 +226,18 @@ export class HudScene extends Phaser.Scene {
   private drawOverlay(scene: GameScene): void {
     const g = this.gfx;
     switch (scene.state) {
-      case 'won':
+      case 'won': {
+        // Nothing over the top of the gate taking the body: the banner waits for it.
+        if (!scene.captureDone) {
+          this.banner.setText('');
+          this.hint.setText('');
+          break;
+        }
         g.fillStyle(0x05030a, 0.72).fillRect(0, 0, VIEW_W, VIEW_H);
         this.banner.setText('TIMELINE RESOLVED').setColor('#f7e26b');
         this.hint.setText(scene.hasNextLevel ? '[ENTER] next level' : '[ENTER] play again');
         break;
+      }
       case 'dust':
         this.banner.setText('THE UNIVERSE ENDS').setColor('#d6b3ff');
         this.hint.setText(scene.message);

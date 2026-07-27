@@ -78,7 +78,7 @@ function buildThreshold(): LevelDef {
     boxes: [
       { x: 30 * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick: MONOLITH_RELEASE },
     ],
-    devices: [pad('chronoporter', 26, 15, 'CHRONOPORTER — drag the slider')],
+    devices: [pad('chronoporter', 26, 15, 'CHRONOPORTER')],
     hazards: [],
     exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
   };
@@ -98,7 +98,7 @@ function monolith(cx: number, releaseTick: number): BoxSpec {
   return { x: cx * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick };
 }
 
-const PORTER_LABEL = 'CHRONOPORTER — drag the slider';
+const PORTER_LABEL = 'CHRONOPORTER';
 
 /**
  * "Interval" — two stones on the same run, let go at different times. The near one
@@ -221,7 +221,7 @@ function buildLift(): LevelDef {
       { x: 23 * TILE + 4, y: 15 * TILE - 28, w: 28, h: 28 },
       monolith(24, LIFT_RELEASE),
     ],
-    devices: [pad('anachroverter', 19, 15, 'ANACHROVERTER — [R] reverse time')],
+    devices: [pad('anachroverter', 19, 15, 'ANACHROVERTER')],
     hazards: [],
     exit: { x: 29.5 * TILE, y: 2 * TILE - 26, r: 22 },
   };

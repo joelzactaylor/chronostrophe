@@ -22,6 +22,10 @@ npm run build      # production bundle in dist/
 | level select | `ESC`, or the LEVELS button |
 | reverse time (on an anachroverter) | `R` |
 | scrub time (on a time device) | drag the slider under the viewport |
+| mute | `M`, or the SOUND button |
+
+The sound is synthesised at runtime (`src/game/audio.ts`) rather than loaded, so there
+are no audio files in the repository; the mute setting is remembered in `localStorage`.
 
 ## The model
 

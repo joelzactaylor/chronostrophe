@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { LEVELS, buildLevel } from './level';
 import { VIEW_H, VIEW_W } from './GameScene';
+import { fadeIn, fadeOutThen } from './transition';
+import { sfx } from './audio';
 
 const ROW_H = 42;
 const TOP = 150;
@@ -23,6 +25,7 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     this.scene.stop('hud');
     this.gfx = this.add.graphics();
+    fadeIn(this);
 
     this.add
       .text(VIEW_W / 2, 62, 'CHRONOSTROPHE', {
@@ -61,9 +64,11 @@ export class MenuScene extends Phaser.Scene {
       if (Number.isInteger(n) && n >= 1 && n <= LEVELS.length) this.play(n - 1);
     });
 
+    kb.on('keydown', () => sfx.unlock());
+    this.input.on('pointerdown', () => sfx.unlock());
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
       const row = this.rowAt(p);
-      if (row !== null) this.cursor = row;
+      if (row !== null && row !== this.cursor) this.move(row - this.cursor);
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       const row = this.rowAt(p);
@@ -79,10 +84,13 @@ export class MenuScene extends Phaser.Scene {
 
   private move(d: number): void {
     this.cursor = Phaser.Math.Wrap(this.cursor + d, 0, LEVELS.length);
+    sfx.menuMove();
   }
 
   private play(index: number): void {
-    this.scene.start('game', { level: index });
+    sfx.unlock();
+    sfx.menuSelect();
+    fadeOutThen(this, 200, () => this.scene.start('game', { level: index }));
   }
 
   override update(time: number): void {
