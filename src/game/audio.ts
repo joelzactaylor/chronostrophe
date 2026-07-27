@@ -108,6 +108,13 @@ class Sfx {
     this.tone('square', 330, 620, 0.12, 0.09);
   }
 
+  /** A spring firing: a coil letting go, tuned brighter than a jump. */
+  spring(): void {
+    if (this.throttled('spring', 80)) return;
+    this.tone('triangle', 260, 900, 0.16, 0.11);
+    this.tone('square', 520, 1300, 0.1, 0.04);
+  }
+
   land(): void {
     if (this.throttled('land', 90)) return;
     this.hiss(0.09, 0.16, 220, 0.8);

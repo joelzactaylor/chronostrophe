@@ -66,10 +66,15 @@ the `build…` function to paste into `src/game/level.ts`. Controls are in
 ## Buttons
 
 A button is pressed while anything is resting in it — you, a former self, a crate, a monolith — and
-released the moment nothing is; it is never solid. Its group's orange phase blocks are solid while
+released the moment nothing is; it is never solid. Its group's phase blocks — drawn in the group's own colour, as the button is — are solid while
 it is up and passable while it is held (or the reverse, for blocks declared `inverted`). Both states
 apply to everything in the world, so a phased-out block holds nothing up and a block that goes solid
 under a falling stone stops it. See [docs/AUTHORING.md](docs/AUTHORING.md).
+
+## Springs
+
+A spring block throws whatever lands on it about 120px straight up, where a jump clears 88px. It
+needs no input and cannot be held: land on one and you are thrown, every time.
 
 ## Devices
 

@@ -10,6 +10,7 @@ import {
   ROWS,
   monolith,
   padRect,
+  spring,
 } from './level';
 
 /**
@@ -29,6 +30,7 @@ export interface Draft {
   buttons: { cx: number; row: number; group: number }[];
   phase: { cx: number; cy: number; group: number; inverted: boolean }[];
   hazards: { cx: number; cy: number }[];
+  springs: { cx: number; row: number }[];
 }
 
 const PORTER_LABEL: Record<DeviceKind, string> = {
@@ -58,6 +60,7 @@ export function blankDraft(): Draft {
     buttons: [],
     phase: [],
     hazards: [],
+    springs: [],
   };
 }
 
@@ -92,6 +95,7 @@ export function draftToLevel(d: Draft): LevelDef {
     buttons,
     phase,
     hazards: d.hazards.map((h) => ({ x: h.cx * TILE, y: h.cy * TILE, w: TILE, h: TILE })),
+    springs: d.springs.map((sp) => spring(sp.cx, sp.row)),
     exit: { x: (d.exit.cx + 0.5) * TILE, y: d.exit.row * TILE - 26, r: 22 },
   };
 }
@@ -206,6 +210,7 @@ export function draftToCode(d: Draft): string {
   const hazards = d.hazards.map(
     (h) => `{ x: ${h.cx} * TILE, y: ${h.cy} * TILE, w: TILE, h: TILE }`,
   );
+  const springs = d.springs.map((sp) => `spring(${sp.cx}, ${sp.row})`);
 
   const lines = [
     '/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */',
@@ -224,6 +229,7 @@ export function draftToCode(d: Draft): string {
     `    buttons: ${list(buttons)},`,
     `    phase: ${list(phase)},`,
     `    hazards: ${list(hazards)},`,
+    `    springs: ${list(springs)},`,
     `    exit: { x: ${d.exit.cx + 0.5} * TILE, y: ${d.exit.row} * TILE - 26, r: 22 },`,
     '  };',
     '}',

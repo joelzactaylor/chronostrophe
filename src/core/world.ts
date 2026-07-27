@@ -8,6 +8,7 @@ import {
   GROUND_TILE,
   PHASE_SOLID,
   PlayerState,
+  SPRING_SOLID,
   Rect,
   Run,
   TICKS,
@@ -28,6 +29,15 @@ export const PLAYER_W = 20;
 export const PLAYER_H = 28;
 export const PLAYER_DUCK_H = 16;
 export const BOX_PUSH_SPEED = 130;
+
+/**
+ * How hard a spring throws a body: v = sqrt(2 g h) for h = 120px, so a bounce
+ * clears about four tiles where a jump clears not quite three.
+ */
+export const SPRING_VEL = -Math.sqrt(2 * 1900 * 120);
+
+/** A spring is a low plate sitting on the floor rather than a whole tile. */
+export const SPRING_H = 12;
 
 /** Separation kept between a shoved object and the body that shoved it. */
 const EPS = 0.02;
@@ -135,6 +145,12 @@ export class World {
    */
   private readonly deviceSolids: SolidRect[];
 
+  readonly springs: SolidRect[];
+  /** Set on the tick a spring throws the body, for the sound and the squash. */
+  sprungOn: Rect | null = null;
+  /** True while a spring's throw is still carrying the body upward. */
+  private springing = false;
+
   readonly buttons: ButtonSpec[];
   readonly phase: PhaseSpec[];
   /** The groups whose button is held down as the world stands right now. */
@@ -147,9 +163,11 @@ export class World {
     devices: Rect[] = [],
     buttons: ButtonSpec[] = [],
     phase: PhaseSpec[] = [],
+    springs: Rect[] = [],
   ) {
     this.map = map;
     this.spawn = spawn;
+    this.springs = springs.map((r) => ({ ...r, id: SPRING_SOLID }));
     this.buttons = buttons;
     this.phase = phase;
     this.deviceSolids = devices.map((r) => ({ ...r, id: DEVICE_SOLID }));
@@ -333,7 +351,7 @@ export class World {
     return this.boxes
       .filter((o) => o !== box)
       .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
-      .concat(this.deviceSolids, this.phaseSolids());
+      .concat(this.deviceSolids, this.phaseSolids(), this.springs);
   }
 
   /**
@@ -399,7 +417,7 @@ export class World {
         ? this.boxes
             .filter((o) => o !== box && !o.immovable)
             .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
-            .concat(this.phaseSolids())
+            .concat(this.phaseSolids(), this.springs)
         : [...this.otherBoxSolids(box), ...ghosts];
       if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);
@@ -453,9 +471,12 @@ export class World {
       this.buffered = 0;
       this.coyote = 0;
       p.groundedOn = GROUND_NONE;
-    } else if (!input.jump && p.vy < 0) {
+    } else if (!input.jump && p.vy < 0 && !this.springing) {
+      // A spring's throw is the spring's, not the player's: releasing jump cuts a
+      // jump short but must not cut a bounce short.
       p.vy *= JUMP_CUT;
     }
+    if (p.vy >= 0) this.springing = false;
 
     // Gravity is always downward, whichever way global time runs.
     p.vy = Math.min(p.vy + GRAVITY * DT, 1200);
@@ -473,10 +494,26 @@ export class World {
     const hy = moveY(rect, p.vy * DT, this.map, this.solids());
     if (hy.groundedOn !== GROUND_NONE) p.vy = 0;
     if (hy.ceiling) p.vy = 0;
+    // A spring is open to the body — walking into one is not walking into a wall —
+    // and throws it the moment it touches, however it arrived.
+    this.sprungOn = null;
+    const sprung = p.vy >= 0 ? (this.springs.find((sp) => rectsOverlap(rect, sp)) ?? null) : null;
+    if (sprung) {
+      p.vy = SPRING_VEL;
+      p.groundedOn = GROUND_NONE;
+      this.buffered = 0;
+      this.coyote = 0;
+      this.sprungOn = sprung;
+      this.springing = true;
+    }
     if (Math.max(dp.correction, hx.correction, hy.correction) > PLAYER_W) this.crushed = true;
     p.x = rect.x;
     p.y = rect.y;
-    p.groundedOn = hy.groundedOn !== GROUND_NONE ? hy.groundedOn : supportUnder(rect, this.map, this.solids());
+    p.groundedOn = this.sprungOn
+      ? GROUND_NONE
+      : hy.groundedOn !== GROUND_NONE
+        ? hy.groundedOn
+        : supportUnder(rect, this.map, this.solids());
   }
 
   /** The player is weightless but can shove live boxes sideways. */

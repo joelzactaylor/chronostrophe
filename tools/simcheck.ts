@@ -3,9 +3,9 @@
  * scrubbing, reverse-time worldline replay and the "ride the rewinding box"
  * mechanic the level is built around. Run with `npm run check:sim`.
  */
-import { LevelDef, MONOLITH_RELEASE, buildLevel, button, phaseBlocks } from '../src/game/level';
+import { LevelDef, MONOLITH_RELEASE, buildLevel, button, phaseBlocks, spring } from '../src/game/level';
 import { TileMap } from '../src/core/physics';
-import { NO_INPUT, World, playerRect } from '../src/core/world';
+import { NO_INPUT, SPRING_H, World, playerRect } from '../src/core/world';
 import { Input } from '../src/core/world';
 import { TILE } from '../src/core/types';
 
@@ -229,6 +229,7 @@ function levelWorld(level: LevelDef): World {
     level.devices.map((d) => d.rect),
     level.buttons ?? [],
     level.phase ?? [],
+    level.springs ?? [],
   );
 }
 
@@ -753,6 +754,69 @@ function levelWorld(level: LevelDef): World {
     w2.player.x > level.exit.x - 30,
     `x=${w2.player.x} exit=${level.exit.x}`,
   );
+}
+
+// 25. A spring throws the body about 120px up, and does it again on the way down.
+{
+  const rows: string[] = [];
+  for (let y = 0; y < 17; y++) {
+    let row = '';
+    for (let x = 0; x < 44; x++) row += y >= 15 || x === 0 || x === 43 ? '#' : '.';
+    rows.push(row);
+  }
+  const floorTop = 15 * TILE;
+  const w = new World(
+    new TileMap(rows),
+    { x: 6 * TILE, y: floorTop - 200 },
+    [],
+    [],
+    [],
+    [],
+    [spring(6, 15)],
+  );
+
+  // Fall onto it first, then measure the rise from the moment it fires.
+  let bounces = 0;
+  while (bounces === 0) {
+    w.step(NO_INPUT);
+    if (w.sprungOn) bounces++;
+  }
+  let apex = w.player.y;
+  for (let i = 0; i < 240; i++) {
+    w.step(NO_INPUT);
+    if (w.sprungOn) bounces++;
+    apex = Math.min(apex, w.player.y);
+  }
+  const rise = floorTop - SPRING_H - (apex + 28);
+  check('a spring throws the body about 120px up', Math.abs(rise - 120) < 8, `rise=${rise}`);
+  check('and does it again every time it comes down', bounces >= 2, `bounces=${bounces}`);
+  check('the body is not left resting inside the spring', w.player.y + 28 <= floorTop - SPRING_H + 1, `y=${w.player.y}`);
+}
+
+// 26. Walking into a spring bounces the body rather than stopping it dead.
+{
+  const rows: string[] = [];
+  for (let y = 0; y < 17; y++) {
+    let row = '';
+    for (let x = 0; x < 44; x++) row += y >= 15 || x === 0 || x === 43 ? '#' : '.';
+    rows.push(row);
+  }
+  const floorTop = 15 * TILE;
+  const w = new World(
+    new TileMap(rows),
+    { x: 6 * TILE, y: floorTop - 28 },
+    [],
+    [],
+    [],
+    [],
+    [spring(12, 15)],
+  );
+  let sprung = false;
+  for (let i = 0; i < 200 && !sprung; i++) {
+    w.step({ ...NO_INPUT, right: true });
+    if (w.sprungOn) sprung = true;
+  }
+  check('walking into a spring throws the body instead of blocking it', sprung, `x=${w.player.x}`);
 }
 
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);

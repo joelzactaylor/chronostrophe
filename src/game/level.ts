@@ -1,5 +1,5 @@
 import { TileMap } from '../core/physics';
-import { BoxSpec, ButtonSpec, PLAYER_H, PLAYER_W, PhaseSpec } from '../core/world';
+import { BoxSpec, ButtonSpec, PLAYER_H, PLAYER_W, PhaseSpec, SPRING_H } from '../core/world';
 import { Rect, TILE, clamp } from '../core/types';
 
 export type DeviceKind = 'chronoporter' | 'anachroverter' | 'chronoclast';
@@ -25,6 +25,8 @@ export interface LevelDef {
   buttons?: ButtonSpec[];
   /** Blocks that swap between solid and passable with a button's group. */
   phase?: PhaseSpec[];
+  /** Spring blocks: stand on one and it throws you about 120px up. */
+  springs?: Rect[];
 }
 
 export const COLS = 44;
@@ -90,6 +92,11 @@ export function phaseBlocks(
     }
   }
   return out;
+}
+
+/** A spring block standing on the floor of `surfaceRow`, one tile wide. */
+export function spring(cx: number, surfaceRow: number, tiles = 1): Rect {
+  return { x: cx * TILE, y: surfaceRow * TILE - SPRING_H, w: tiles * TILE, h: SPRING_H };
 }
 
 /** Tick at which the monolith of level 1 is let go. */

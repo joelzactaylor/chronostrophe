@@ -13,6 +13,9 @@ export const DEVICE_SOLID = -4;
 /** A phase block while it is in its solid form. */
 export const PHASE_SOLID = -5;
 
+/** A spring block: solid to stand on, and it throws off whatever lands on it. */
+export const SPRING_SOLID = -6;
+
 export interface Rect {
   x: number;
   y: number;

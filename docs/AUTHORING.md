@@ -62,7 +62,8 @@ pad('chronoporter'  , cx, surfaceRow, label)    // stand on it to scrub the time
 pad('anachroverter' , cx, surfaceRow, label)    // stand on it and press R to flip time's direction
 pad('chronoclast'   , cx, surfaceRow, label)    // erases your recorded history
 button(cx, surfaceRow, group, tiles = 1)        // a push button; anything in it holds it down
-phaseBlocks(group, x0, y0, x1, y1, inverted?)   // orange blocks that swap phase with that group
+phaseBlocks(group, x0, y0, x1, y1, inverted?)   // blocks that swap phase with that group
+spring(cx, surfaceRow, tiles = 1)               // a spring block: standing on it throws you ~120px
 hazards: [{ x, y, w, h }]                       // spikes: touching them kills
 exit:    { x, y, r }                            // the gate, as a centre and a radius
 ```
@@ -78,6 +79,18 @@ it is **solid to objects but open to the live body**, so crates stop against it 
 settle in the space you have to stand in. A pad in a crate's path is therefore a wall for the crate:
 put pads where the crate does not have to travel.
 
+### Springs
+
+```ts
+springs: [spring(22, 15)],                        // on the floor at row 15
+```
+
+A spring is a low plate on the floor that throws the body about **120px** up the moment it lands on
+it — half again what a jump clears (88px), so a shelf out of jumping reach can be put in reach with
+a spring instead of a crate. It fires on landing, with no input and nothing to hold: coming down on
+one bounces you again, and walking into its side throws you just the same — it is open to the body,
+never a wall. It does hold crates and stones up, so a crate parked on one covers it.
+
 ### Buttons and phase blocks
 
 ```ts
@@ -88,7 +101,8 @@ phase: [
 ],
 ```
 
-A button is **pressed while anything at all is resting in it** — the live body, a former self, a
+A button and its blocks share a colour, and each group has its own, so which button opens which way
+through is read off the screen. A button is **pressed while anything at all is resting in it** — the live body, a former self, a
 crate, a monolith — and **up again the instant nothing is**: it is a push button, not a switch, so
 holding a door open means leaving something in it. It is not solid; things stand *in* it, never on
 it, and it never blocks a crate or a body.
@@ -139,7 +153,7 @@ function holds, so anything you draw can be played at once and printed as that f
 |---|---|
 | paint / place | left click (drag to paint) |
 | clear a tile | right click, or the ERASE tool |
-| tools | `1` wall, `2` erase, `3` spawn, `4` gate, `5` crate, `6` monolith, `7` chronoporter, `8` anachroverter, `9` chronoclast, `0` spikes, `B` button, `P` phase block, `O` inverted phase block |
+| tools | `1` wall, `2` erase, `3` spawn, `4` gate, `5` crate, `6` monolith, `7` chronoporter, `8` anachroverter, `9` chronoclast, `0` spikes, `B` button, `P` phase block, `O` inverted phase block, `S` spring |
 | button/phase group | `G` cycles it; a group is drawn in its own colour, and blocks answer the button of the same colour |
 | monolith release tick | `[` and `]`, in steps of 30 (60 ticks is a second) |
 | rename | `F2` |

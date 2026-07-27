@@ -20,7 +20,8 @@ type Tool =
   | 'hazard'
   | 'button'
   | 'phase'
-  | 'phaseInv';
+  | 'phaseInv'
+  | 'spring';
 
 const TOOLS: { tool: Tool; key: string; label: string }[] = [
   { tool: 'wall', key: '1', label: 'WALL' },
@@ -36,6 +37,7 @@ const TOOLS: { tool: Tool; key: string; label: string }[] = [
   { tool: 'button', key: 'B', label: 'BUTTON' },
   { tool: 'phase', key: 'P', label: 'PHASE' },
   { tool: 'phaseInv', key: 'O', label: 'PHASE-INV' },
+  { tool: 'spring', key: 'S', label: 'SPRING' },
 ];
 
 const UI_H = 96;
@@ -182,6 +184,9 @@ export class EditorScene extends Phaser.Scene {
       case 'hazard':
         d.hazards.push({ cx, cy });
         break;
+      case 'spring':
+        d.springs.push({ cx, row });
+        break;
       case 'button':
         d.buttons.push({ cx, row, group: this.group });
         break;
@@ -201,14 +206,15 @@ export class EditorScene extends Phaser.Scene {
   /** Removes whatever occupies a tile, walls last: one click, one thing gone. */
   private clearTile(cx: number, cy: number): void {
     const d = this.draft;
-    const before = [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length];
+    const before = [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length, d.springs.length];
     d.crates = d.crates.filter((c) => !(c.cx === cx && c.row === cy + 1));
     d.monoliths = d.monoliths.filter((m) => !(cx >= m.cx && cx < m.cx + 4 && cy >= 2 && cy < 5));
     d.pads = d.pads.filter((p) => !(p.cx === cx && p.row === cy + 1));
     d.buttons = d.buttons.filter((b) => !(b.cx === cx && b.row === cy + 1));
     d.phase = d.phase.filter((p) => !(p.cx === cx && p.cy === cy));
     d.hazards = d.hazards.filter((h) => !(h.cx === cx && h.cy === cy));
-    const after = [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length];
+    d.springs = d.springs.filter((sp) => !(sp.cx === cx && sp.row === cy + 1));
+    const after = [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length, d.springs.length];
     if (before.every((n, i) => n === after[i])) this.setWall(cx, cy, false);
   }
 
@@ -314,6 +320,17 @@ export class EditorScene extends Phaser.Scene {
       for (let i = 0; i < 4; i++) {
         const x = h.cx * TILE + i * 8;
         g.fillTriangle(x, (h.cy + 1) * TILE, x + 8, (h.cy + 1) * TILE, x + 4, h.cy * TILE);
+      }
+    }
+
+    for (const sp of d.springs) {
+      const y = sp.row * TILE - 12;
+      g.fillStyle(0x9be36a, 1).fillRect(sp.cx * TILE, y, TILE, 3);
+      g.lineStyle(2, 0x9be36a, 0.8);
+      for (let i = 0; i < 3; i++) {
+        const cy = y + 3 + i * 3;
+        g.lineBetween(sp.cx * TILE + 3, cy, sp.cx * TILE + TILE - 3, cy + 1.5);
+        g.lineBetween(sp.cx * TILE + TILE - 3, cy + 1.5, sp.cx * TILE + 3, cy + 3);
       }
     }
 

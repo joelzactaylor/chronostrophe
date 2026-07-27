@@ -55,6 +55,7 @@ const COL_GHOST = 0x76d9ff;
 const COL_BOX = 0xd98b45;
 const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
+const COL_SPRING = 0x9be36a;
 
 export const VIEW_W = 960;
 export const VIEW_H = 544;
@@ -89,6 +90,8 @@ export class GameScene extends Phaser.Scene {
   private capture: Capture | null = null;
   private lastBeat = 0;
   private dust: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  /** When each spring last fired, so it can be drawn recoiling. */
+  private springFired = new Map<string, number>();
 
   constructor() {
     super('game');
@@ -108,6 +111,7 @@ export class GameScene extends Phaser.Scene {
       this.level.devices.map((d) => d.rect),
       this.level.buttons ?? [],
       this.level.phase ?? [],
+      this.level.springs ?? [],
     );
     this.state = 'play';
     this.message = '';
@@ -120,6 +124,7 @@ export class GameScene extends Phaser.Scene {
     this.activeDevice = null;
     this.lastClast = null;
     this.capture = null;
+    this.springFired = new Map();
 
     const g = this.make.graphics({ x: 0, y: 0 });
     g.fillStyle(0xffffff, 1).fillRect(0, 0, 4, 4);
@@ -305,11 +310,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** A spring that fired this tick: remembered for the recoil, and heard. */
+  private noteSpring(): void {
+    const sp = this.world.sprungOn;
+    if (!sp) return;
+    this.springFired.set(`${sp.x},${sp.y}`, this.time.now);
+    sfx.spring();
+  }
+
   private tickBody(input: Input): void {
     const world = this.world;
     if (world.paused) {
       // Timeline frozen on a device: the live body still moves, history does not.
       world.stepPlayerFrozen(input);
+      this.noteSpring();
       // Time is standing still, but the body is still living steps, so an anomaly
       // retracing them still gains: waiting on a pad is not a hiding place.
       this.recordLivedStep();
@@ -321,6 +335,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     world.step(input);
+    this.noteSpring();
     if (this.paradoxGrace > 0) this.paradoxGrace--;
 
     this.recordLivedStep();
@@ -599,6 +614,7 @@ export class GameScene extends Phaser.Scene {
     this.drawTiles(g);
     this.drawPhaseBlocks(g);
     this.drawButtons(g);
+    this.drawSprings(g);
     this.drawHazards(g);
     this.drawExit(g);
     for (const box of this.world.boxes) this.drawBox(g, box);
@@ -671,6 +687,33 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(shade(c, 0.55), 1).fillRect(r.x + 1, r.y + r.h - 7, 2, 7);
       g.fillStyle(shade(c, 0.55), 1).fillRect(r.x + r.w - 3, r.y + r.h - 7, 2, 7);
       if (down) g.fillStyle(c, 0.35).fillRect(r.x + 3, top - 1, r.w - 6, 1);
+    }
+  }
+
+  /**
+   * A spring: a coil under a plate, squashed flat for a moment after it fires and
+   * springing back over the next fraction of a second.
+   */
+  private drawSprings(g: Phaser.GameObjects.Graphics): void {
+    for (const sp of this.level.springs ?? []) {
+      const fired = this.springFired.get(`${sp.x},${sp.y}`);
+      const since = fired === undefined ? Infinity : this.time.now - fired;
+      // Flat at the moment of firing, back to full height a fifth of a second later.
+      const k = Math.min(1, since / 200);
+      const squash = 1 - 0.65 * (1 - k) * (1 - k);
+      const h = sp.h * squash;
+      const top = sp.y + sp.h - h;
+      g.fillStyle(0x120c26, 1).fillRect(sp.x, sp.y + sp.h - 3, sp.w, 3);
+      g.lineStyle(2, COL_SPRING, 0.85);
+      const coils = 3;
+      for (let i = 0; i < coils; i++) {
+        const y = top + 2 + ((h - 4) / coils) * i;
+        g.lineBetween(sp.x + 3, y, sp.x + sp.w - 3, y + (h - 4) / coils / 2);
+        g.lineBetween(sp.x + sp.w - 3, y + (h - 4) / coils / 2, sp.x + 3, y + (h - 4) / coils);
+      }
+      g.fillStyle(COL_SPRING, 1).fillRect(sp.x, top, sp.w, 3);
+      g.fillStyle(tint(COL_SPRING, 0.5), 0.9).fillRect(sp.x, top, sp.w, 1);
+      if (k < 1) g.fillStyle(COL_SPRING, 0.25 * (1 - k)).fillRect(sp.x - 2, top - 10 * (1 - k), sp.w + 4, 10);
     }
   }
 
