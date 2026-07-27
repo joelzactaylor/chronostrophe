@@ -13,6 +13,8 @@ export interface Device {
 
 export interface LevelDef {
   name: string;
+  /** One-line brief shown while the level starts. */
+  brief: string;
   map: TileMap;
   spawn: { x: number; y: number };
   boxes: BoxSpec[];
@@ -62,18 +64,21 @@ function buildThreshold(): LevelDef {
   fill(grid, 0, 15, COLS - 1, ROWS - 1); // one screen-wide floor, nothing to climb
   fill(grid, 0, 0, 0, 14); // left wall
   fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
-
+  fill(grid, 10, 14, 15, 14); // obstacles to practice jumping
+  fill(grid, 11, 13, 14, 13);
+  fill(grid, 12, 12, 13, 12);
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
     name: 'Threshold',
+    brief: 'Run for the gate.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     // Suspended overhead, released mid-sprint: 4x3 tiles of stone, too tall to clear.
     boxes: [
       { x: 30 * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick: MONOLITH_RELEASE },
     ],
-    devices: [pad('chronoporter', 26, 15, PORTER_LABEL)],
+    devices: [pad('chronoporter', 26, 15, 'CHRONOPORTER — drag the slider')],
     hazards: [],
     exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
   };
@@ -93,7 +98,7 @@ function monolith(cx: number, releaseTick: number): BoxSpec {
   return { x: cx * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick };
 }
 
-const PORTER_LABEL = 'CHRONOPORTER';
+const PORTER_LABEL = 'CHRONOPORTER — drag the slider';
 
 /**
  * "Interval" — two stones on the same run, let go at different times. The near one
@@ -105,10 +110,13 @@ function buildInterval(): LevelDef {
   const map = new TileMap(corridorGrid().map((r) => r.join('')));
   return {
     name: 'Interval',
+    brief: 'Two stones, two different moments.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [monolith(12, 150), monolith(24, 180)],
-    devices: [pad('chronoporter', 17, 15, PORTER_LABEL)],
+    devices: [pad('chronoporter', 17, 15, PORTER_LABEL),
+    pad('chronoporter', 10, 15, PORTER_LABEL)
+    ],
     hazards: [],
     exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
   };
@@ -125,11 +133,13 @@ function buildBallast(): LevelDef {
   const grid = corridorGrid();
   fill(grid, 30, 12, 34, 12); // gate shelf: 3 tiles up, a crate's height short of a jump
   fill(grid, 30, 13, 30, 14); // the shelf's near face, which the crate stops against
-  fill(grid, 23, 8, 23, 11); // a wall on the upper left of the monolith
+  fill(grid, 23, 8, 23, 13); // a wall on the upper left of the monolith
+  fill(grid, 21, 13, 22, 13);
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
     name: 'Ballast',
+    brief: 'The crate is the step. Get it through.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     // Clear of the pad on the far side: the pad has to be reachable without
@@ -152,23 +162,28 @@ function buildCascade(): LevelDef {
   const grid = corridorGrid();
   fill(grid, 36, 12, 41, 12); // gate shelf above the last pocket
   fill(grid, 36, 13, 36, 14); // its near face: where the crate comes to a stop
+  fill(grid, 26, 11, 27, 11); // third platform
+  fill(grid, 16, 11, 17, 11); // second platform
+  fill(grid, 7, 10, 8, 10); // first platform
   const map = new TileMap(grid.map((r) => r.join('')));
   return {
     name: 'Cascade',
+    brief: 'Three stones, then a climb.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [
       monolith(10, 150),
       monolith(20, 160),
       monolith(30, 120),
-      { x: 33 * TILE, y: 15 * TILE - 28, w: 28, h: 28 },
+      { x: 35 * TILE, y: 15 * TILE - 28, w: 28, h: 28 },
     ],
     devices: [
       pad('chronoporter', 16, 15, PORTER_LABEL),
       pad('chronoporter', 26, 15, PORTER_LABEL),
+      pad('chronoporter', 8, 15, PORTER_LABEL),
     ],
     hazards: [],
-    exit: { x: 38.5 * TILE, y: 12 * TILE - 26, r: 22 },
+    exit: { x: 4 * TILE, y: 8 * TILE - 26, r: 22 },
   };
 }
 
@@ -199,6 +214,7 @@ function buildLift(): LevelDef {
 
   return {
     name: 'Lift',
+    brief: 'The stone falls. Reverse time and ride it back up.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [
@@ -206,7 +222,7 @@ function buildLift(): LevelDef {
       { x: 23 * TILE + 4, y: 15 * TILE - 28, w: 28, h: 28 },
       monolith(24, LIFT_RELEASE),
     ],
-    devices: [pad('anachroverter', 22, 15, 'ANACHROVERTER')],
+    devices: [pad('anachroverter', 19, 15, 'ANACHROVERTER — [R] reverse time')],
     hazards: [],
     exit: { x: 29.5 * TILE, y: 2 * TILE - 26, r: 22 },
   };
