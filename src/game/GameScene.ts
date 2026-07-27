@@ -32,8 +32,8 @@ export interface Anomaly {
 /** Lived steps the anomaly covers per tick: the consequence outruns its cause. */
 const ANOMALY_SPEED = 2;
 
-/** How long the gate takes to swallow the body, in ms. */
-const CAPTURE_MS = 2100;
+/** How long the gate takes to swallow the body, in ms: a moment, not a cutscene. */
+const CAPTURE_MS = 850;
 
 /** The body's inspiral into the gate, from the moment it touches the horizon. */
 interface Capture {
@@ -177,6 +177,10 @@ export class GameScene extends Phaser.Scene {
       if (this.fisheye) {
         this.fisheye.amount = 0;
         this.fisheye.chroma = 0;
+        this.fisheye.swirl = 3;
+        this.fisheye.centreX = 0.5;
+        this.fisheye.centreY = 0.5;
+        this.fisheye.aspect = 1;
       }
     }
   }
@@ -496,27 +500,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The inspiral. Orbital speed rises as the radius falls, so the last turns are
-   * the fast ones; the body is stretched along its path and squeezed across it as
-   * the difference in pull between its head and its feet grows, and the light
-   * leaving it is dragged redder and dimmer the deeper it goes.
+   * The fall in: the body is drawn towards the gate and shrinks away to nothing,
+   * a little quicker than linearly so the last of it goes suddenly.
    */
-  private captureFrame(): { x: number; y: number; angle: number; long: number; thin: number; k: number } {
+  private captureFrame(): { x: number; y: number; scale: number; k: number } {
     const c = this.capture!;
     const e = this.level.exit;
     const k = clamp(c.t / CAPTURE_MS, 0, 1);
-    // Radius falls away steeply at the end rather than linearly.
-    const r = c.r0 * Math.pow(1 - k, 1.7);
-    // Keplerian-ish: the closer it gets, the faster it goes round.
-    const swept = 5.2 * (Math.pow(c.r0 / Math.max(r, 4), 0.5) - 1);
-    const angle = c.a0 + Math.min(swept, 14);
-    const tide = Math.pow(k, 2.2);
+    const r = c.r0 * Math.pow(1 - k, 1.6);
+    const angle = c.a0 + k * 1.6;
     return {
       x: e.x + Math.cos(angle) * r,
       y: e.y + Math.sin(angle) * r,
-      angle,
-      long: PLAYER_H * (1 + tide * 7),
-      thin: PLAYER_W * (1 - tide * 0.86),
+      scale: Math.pow(1 - k, 1.3),
       k,
     };
   }
@@ -529,11 +525,16 @@ export class GameScene extends Phaser.Scene {
       const cam = this.cameras.main;
       cam.scrollX += (this.level.exit.x - VIEW_W / 2 - cam.scrollX) * 0.06;
       cam.scrollY += (this.level.exit.y - VIEW_H / 2 - cam.scrollY) * 0.06;
-      cam.setZoom(1 + k * 0.22);
-      // A little lensing, not the collapse the fisheye death uses.
+      cam.setZoom(1 + k * 0.1);
+      // The lensing is centred on the gate itself, not the middle of the screen.
       if (this.fisheye) {
-        this.fisheye.amount = k * 0.22;
-        this.fisheye.chroma = k * 0.25;
+        const e = this.level.exit;
+        this.fisheye.aspect = VIEW_W / VIEW_H;
+        this.fisheye.centreX = clamp((e.x - cam.scrollX) / VIEW_W, 0, 1);
+        this.fisheye.centreY = clamp(1 - (e.y - cam.scrollY) / VIEW_H, 0, 1);
+        this.fisheye.swirl = 0.6;
+        this.fisheye.amount = Math.pow(k, 0.8) * 0.34;
+        this.fisheye.chroma = k * 0.3;
       }
     }
     if (this.state === 'fisheye' && this.fisheye) {
@@ -761,40 +762,17 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 0.9).fillRect(r.x + r.w / 2 - 2, r.y - 12, 4, 6);
   }
 
-  /**
-   * The body on its way in: a streak wound round the gate, drawn as an oriented
-   * quad with a few trailing after-images of where it was a moment ago.
-   */
+  /** The body on its way in: the same body, drawn smaller and dimmer each frame. */
   private drawCapturedBody(g: Phaser.GameObjects.Graphics): void {
-    const c = this.capture!;
-    const t0 = c.t;
-    for (let i = 4; i >= 0; i--) {
-      c.t = Math.max(0, t0 - i * 55);
-      const f = this.captureFrame();
-      // Redshifted: yellow through orange to a dim red as it falls in.
-      const col = i === 0 ? mixColor(COL_PLAYER, COL_ANOMALY, f.k) : COL_ANOMALY;
-      const alpha = (i === 0 ? 1 : 0.22) * (1 - f.k * 0.85);
-      const cos = Math.cos(f.angle + Math.PI / 2);
-      const sin = Math.sin(f.angle + Math.PI / 2);
-      const hl = f.long / 2;
-      const ht = f.thin / 2;
-      g.fillStyle(col, alpha);
-      g.fillPoints(
-        [
-          new Phaser.Geom.Point(f.x + cos * hl - sin * ht, f.y + sin * hl + cos * ht),
-          new Phaser.Geom.Point(f.x + cos * hl + sin * ht, f.y + sin * hl - cos * ht),
-          new Phaser.Geom.Point(f.x - cos * hl + sin * ht, f.y - sin * hl - cos * ht),
-          new Phaser.Geom.Point(f.x - cos * hl - sin * ht, f.y - sin * hl + cos * ht),
-        ],
-        true,
-      );
-    }
-    c.t = t0;
     const f = this.captureFrame();
-    // The gate answers: the ring brightens as it takes the mass.
+    const w = PLAYER_W * f.scale;
+    const h = PLAYER_H * f.scale;
+    g.fillStyle(mixColor(COL_PLAYER, COL_ANOMALY, f.k), 1 - f.k * 0.3);
+    g.fillRect(f.x - w / 2, f.y - h / 2, w, h);
+    // The gate answers: the ring tightens and the throat brightens as it takes it.
     const e = this.level.exit;
-    g.lineStyle(2, 0xd6b3ff, 0.5 * (1 - f.k)).strokeCircle(e.x, e.y, e.r * (1.4 - 0.3 * f.k));
-    g.fillStyle(0xffffff, 0.35 * f.k * f.k).fillCircle(e.x, e.y, e.r * 0.72);
+    g.lineStyle(2, 0xd6b3ff, 0.5 * (1 - f.k)).strokeCircle(e.x, e.y, e.r * (1.5 - 0.6 * f.k));
+    g.fillStyle(0xffffff, 0.3 * f.k * f.k).fillCircle(e.x, e.y, e.r * 0.6);
   }
 
   private drawGhost(g: Phaser.GameObjects.Graphics, s: PlayerState): void {
