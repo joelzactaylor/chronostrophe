@@ -167,7 +167,11 @@ export class HudScene extends Phaser.Scene {
     if (cur.tMax > cur.tMin) {
       const a = TRACK_X + (cur.tMin / TICKS) * TRACK_W;
       const b = TRACK_X + (cur.tMax / TICKS) * TRACK_W;
-      g.fillStyle(0xf7e26b, 0.5).fillRect(a, TRACK_Y - 12, Math.max(2, b - a), 5);
+      // When the timeline is paused (player on a device), the current run's
+      // recorded segment is all past — shown in blue like closed runs, not
+      // yellow like an active present.
+      const color = w.paused ? 0x76d9ff : 0xf7e26b;
+      g.fillStyle(color, w.paused ? 0.35 : 0.5).fillRect(a, TRACK_Y - 12, Math.max(2, b - a), 5);
     }
 
     g.fillStyle(0x1b1436, 1).fillRect(TRACK_X, TRACK_Y - 3, TRACK_W, 6);

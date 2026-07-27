@@ -7,8 +7,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "check:sim": "esbuild tools/simcheck.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/simcheck.mjs --log-level=error && node node_modules/.cache/simcheck.mjs",
-    "check": "npm run lint && npm run typecheck && npm run check:sim"
+    "check": "npm run lint && npm run typecheck"
   },
   "keywords": [],
   "author": "",

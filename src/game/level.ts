@@ -433,6 +433,42 @@ function buildGroups(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildInversion(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 16, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 15); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
+  fill(grid, 10, 11, 13, 11);
+  fill(grid, 22, 11, 29, 11);
+  fill(grid, 9, 12, 10, 12);
+  fill(grid, 13, 12, 13, 12);
+  fill(grid, 29, 12, 30, 12);
+  fill(grid, 8, 13, 9, 13);
+  fill(grid, 13, 13, 13, 13);
+  fill(grid, 30, 13, 31, 13);
+  fill(grid, 7, 14, 8, 14);
+  fill(grid, 13, 14, 13, 14);
+  fill(grid, 31, 14, 32, 14);
+  fill(grid, 1, 15, 13, 15);
+  fill(grid, 17, 15, 42, 15);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Inversion',
+    brief: '',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 24 * TILE, y: 10 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 11, 11, 'CHRONOPORTER'), pad('chronoporter', 28, 11, 'CHRONOPORTER')],
+    buttons: [button(36, 15, 1), button(5, 15, 0), button(15, 16, 0)],
+    phase: [...phaseBlocks(0, 14, 11, 21, 11), ...phaseBlocks(0, 13, 10, 13, 10, true), ...phaseBlocks(0, 13, 9, 13, 9, true), ...phaseBlocks(0, 13, 8, 13, 8, true), ...phaseBlocks(0, 13, 7, 13, 7, true), ...phaseBlocks(0, 13, 6, 13, 6, true), ...phaseBlocks(0, 13, 5, 13, 5, true), ...phaseBlocks(0, 13, 4, 13, 4, true), ...phaseBlocks(0, 13, 3, 13, 3, true), ...phaseBlocks(0, 13, 2, 13, 2, true), ...phaseBlocks(0, 13, 1, 13, 1, true), ...phaseBlocks(0, 13, 0, 13, 0, true), ...phaseBlocks(0, 26, 10, 26, 10, true), ...phaseBlocks(0, 26, 9, 26, 9, true), ...phaseBlocks(0, 26, 8, 26, 8, true), ...phaseBlocks(0, 26, 7, 26, 7, true), ...phaseBlocks(0, 26, 6, 26, 6, true), ...phaseBlocks(0, 26, 5, 26, 5, true), ...phaseBlocks(0, 26, 4, 26, 4, true), ...phaseBlocks(0, 26, 3, 26, 3, true), ...phaseBlocks(0, 26, 2, 26, 2, true), ...phaseBlocks(0, 26, 1, 26, 1, true), ...phaseBlocks(0, 26, 0, 26, 0, true), ...phaseBlocks(1, 17, 13, 26, 13, true)],
+    hazards: [{ x: 14 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 28.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -444,6 +480,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildSwitchback,
   buildServant,
   buildGroups,
+  buildInversion,
 ];
 
 export function buildLevel(index = 0): LevelDef {

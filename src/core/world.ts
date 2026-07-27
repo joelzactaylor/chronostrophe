@@ -241,7 +241,13 @@ export class World {
 
   /** Closes the active recording segment into history and opens a fresh one. */
   splitRun(): void {
-    if (this.current.tMax > this.current.tMin) this.runs.push(this.current);
+    if (this.current.tMax > this.current.tMin) {
+      // Remove the last recorded frame so ghosts don't stick to device edges.
+      const last = this.current.tMax;
+      this.current.states[last] = undefined;
+      this.current.tMax = last - 1;
+      this.runs.push(this.current);
+    }
     this.current = this.newRun();
   }
 
@@ -259,7 +265,15 @@ export class World {
   }
 
   boxStateAt(box: Box, t: number): BoxState {
-    return box.record[clamp(t, 0, box.recordedMax)] ?? box.initial;
+    const idx = clamp(t, 0, box.recordedMax);
+    // Scrub or simulation may have skipped ticks that were never recorded (e.g.
+    // after the chronoporter skipped forward past recordedMax).  Walk backwards
+    // to the last known state rather than jumping to the starting position.
+    for (let i = idx; i >= 0; i--) {
+      const s = box.record[i];
+      if (s) return s;
+    }
+    return box.initial;
   }
 
   solids(): SolidRect[] {
@@ -286,6 +300,14 @@ export class World {
     for (const run of this.runs) {
       const s = run.states[t];
       if (s) out.push({ run, state: s });
+    }
+    // When the timeline is paused (player on a device), the current run's recorded
+    // states are also history — the player is standing still in time while the body
+    // has already lived those ticks. Show them as ghosts so scrubbing back reveals
+    // the player's own path to the device.
+    if (this.paused) {
+      const s = this.current.states[t];
+      if (s) out.push({ run: this.current, state: s });
     }
     return out;
   }
@@ -415,9 +437,9 @@ export class World {
       // nothing else: not by a pad, not by a former self, and never sideways.
       const others = box.immovable
         ? this.boxes
-            .filter((o) => o !== box && !o.immovable)
-            .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
-            .concat(this.phaseSolids(), this.springs)
+          .filter((o) => o !== box && !o.immovable)
+          .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
+          .concat(this.phaseSolids(), this.springs)
         : [...this.otherBoxSolids(box), ...ghosts];
       if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);
@@ -428,6 +450,13 @@ export class World {
       box.state.vx = 0;
     }
     for (const box of all) {
+      // When simulation resumes after a scrub past recordedMax (e.g. stepping off
+      // a chronoporter), the skipped ticks were never filled in.  Backfill the gap
+      // with the last known state so scrubbing backwards lands on consistent data.
+      const lastKnown = box.record[box.recordedMax] ?? box.initial;
+      for (let i = box.recordedMax + 1; i < target; i++) {
+        box.record[i] = { ...lastKnown };
+      }
       box.record[target] = { ...box.state };
       box.recordedMax = Math.max(box.recordedMax, target);
     }
@@ -529,8 +558,9 @@ export class World {
   /**
    * Checks whether recorded history can still validly unfold at the current time.
    * Ghosts pass straight through the live body; history breaks when the world stops
-   * being able to produce the recorded run: a recorded body stands on nothing, or a
-   * box sits where the run's body was.
+   * being able to produce the recorded run: a recorded body stands on nothing, a
+   * box sits where the run's body was, a ghost overlaps a block that is now solid,
+   * or a ghost stands on a phase block that is now passable.
    */
   detectParadox(): Paradox | null {
     for (const { run, state } of this.ghostsAt(this.now)) {
@@ -561,6 +591,25 @@ export class World {
         const recRect: Rect = { x: rec.x, y: rec.y, w: box.w, h: box.h };
         if (!rectsOverlap(g, recRect)) {
           return { run, tick: this.now, reason: 'a crate is where a former self was', x: g.x, y: g.y };
+        }
+      }
+
+      // A phase block that is now solid but has a ghost inside it: the ghost's
+      // run walked through open space that is now a wall.
+      for (const p of this.phase) {
+        if (this.isSolidPhase(p) && rectsOverlap(g, p.rect)) {
+          return { run, tick: this.now, reason: 'a former self is inside a phase block', x: g.x, y: g.y };
+        }
+      }
+
+      // A ghost that was standing on a phase block (groundedOn === PHASE_SOLID)
+      // is now supported by nothing if that block went passable. Uses the same
+      // probe logic as holdsUp() for consistency.
+      if (state.groundedOn === PHASE_SOLID) {
+        const probe: Rect = { x: g.x, y: g.y + g.h - 2, w: g.w, h: GHOST_SUPPORT_PROBE + 2 };
+        const onPhase = this.phase.some((p) => this.isSolidPhase(p) && rectsOverlap(probe, p.rect));
+        if (!onPhase) {
+          return { run, tick: this.now, reason: 'a former self was standing on a phase block', x: g.x, y: g.y };
         }
       }
     }
