@@ -23,7 +23,6 @@ export class HudScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private status!: Phaser.GameObjects.Text;
   private clock!: Phaser.GameObjects.Text;
-  private dirText!: Phaser.GameObjects.Text;
   private banner!: Phaser.GameObjects.Text;
   private hint!: Phaser.GameObjects.Text;
   private abandon!: Phaser.GameObjects.Text;
@@ -45,7 +44,6 @@ export class HudScene extends Phaser.Scene {
     const font = { fontFamily: 'monospace', fontSize: '14px', color: '#cfd8ff' };
     this.status = this.add.text(16, VIEW_H + 10, '', font);
     this.clock = this.add.text(VIEW_W - 78, TRACK_Y - 9, '', { ...font, color: '#f7e26b' });
-    this.dirText = this.add.text(16, TRACK_Y - 9, '', { ...font, color: '#8892bd' });
     this.banner = this.add
       .text(VIEW_W / 2, VIEW_H / 2 - 20, '', {
         fontFamily: 'monospace',
@@ -186,24 +184,24 @@ export class HudScene extends Phaser.Scene {
     g.fillStyle(live ? 0x38bdf8 : 0xf7e26b, 1).fillCircle(dotX, TRACK_Y, 8);
     g.fillStyle(0x08040f, 1).fillCircle(dotX, TRACK_Y, 3);
 
-    // direction arrow
-    const ax = 92;
-    const s = w.dir;
-    g.fillStyle(w.paused ? 0x8892bd : 0x76d9ff, 1);
-    g.fillRect(ax - 22, TRACK_Y - 2, 30, 4);
-    g.fillTriangle(
-      ax + (s === 1 ? 8 : -22),
-      TRACK_Y - 9,
-      ax + (s === 1 ? 8 : -22),
-      TRACK_Y + 9,
-      ax + (s === 1 ? 22 : -36),
-      TRACK_Y,
-    );
+    // The direction of time, drawn only while time is going anywhere.
+    if (!w.paused) {
+      const ax = 92;
+      const s = w.dir;
+      g.fillStyle(0x76d9ff, 1);
+      g.fillRect(ax - 22, TRACK_Y - 2, 30, 4);
+      g.fillTriangle(
+        ax + (s === 1 ? 8 : -22),
+        TRACK_Y - 9,
+        ax + (s === 1 ? 8 : -22),
+        TRACK_Y + 9,
+        ax + (s === 1 ? 22 : -36),
+        TRACK_Y,
+      );
+    }
 
     const secs = (w.now / 60).toFixed(2);
     this.clock.setText(`T ${secs}s`);
-    // No word for the direction of time: the arrow beside the track says it.
-    this.dirText.setText(w.paused ? 'PAUSED' : '');
     // The name of the level; no brief, because where a stone falls is the puzzle.
     const level = `${scene.levelIndex + 1}. ${scene.level.name.toUpperCase()}`;
     // Whatever just happened, or - while stood on a pad - how that pad is worked.
