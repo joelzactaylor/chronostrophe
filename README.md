@@ -44,13 +44,11 @@ Writing your own levels: [docs/AUTHORING.md](docs/AUTHORING.md).
 
 ## Levels
 
-| # | level | the idea |
-| --- | --- | --- |
-| 1 | Threshold | A flat sprint for the gate. 2.5 s in, a suspended monolith is let go and walls off the run. The chronoporter sits on the near side: scrub the world back to before the stone fell, then walk under the space it is going to occupy. |
-| 2 | Interval | Two stones on the same run, let go at different moments. Sprint past the near one inside its window to reach the pad in the middle, then scrub back to walk through the far corridor, which is already sealed in the present. |
-| 3 | Ballast | The gate is on a shelf out of jumping reach and the crate is the step that closes the gap — but the crate starts on the near side of a stone that comes down four seconds in, and shoving a crate is slow. Scrub back at the pad beside it and there is time to push it through. |
-| 4 | Cascade | Three stones down a long run, each one let go too early to be beaten from where the last one left you. Every pocket between them has its own pad: reach it, put the world back to the start, walk on. The gate is up on a shelf at the end, so the last pocket has to be left with the crate. |
-| 5 | Lift | The introduction to the anachroverter. The gate is high up beside the place a stone hangs, and there is no way up until the stone comes down. Reverse time on the pad, climb the crate onto the resting stone, and ride it back up its own fall to the gate. |
+1. Threshold — the chronoporter
+2. Interval
+3. Ballast — crates
+4. Cascade
+5. Lift — the anachroverter
 
 Reaching a gate advances to the next level with `ENTER`. Every level is unlocked from the start:
 the menu is the first thing the game shows, and `ESC` returns to it.

@@ -343,9 +343,7 @@ export class GameScene extends Phaser.Scene {
   deviceHint(): string | null {
     const d = this.activeDevice;
     if (!d) return null;
-    return d.kind === 'anachroverter'
-      ? `${d.label} — [R] reverses the direction of time`
-      : `${d.label} — drag the slider to move the world through time`;
+    return d.kind === 'anachroverter' ? `${d.label} — [R] reverses time` : `${d.label} — drag the slider`;
   }
 
   /** Lived steps between the nearest anomaly and the present, or null if there is none. */
