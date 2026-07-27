@@ -133,8 +133,7 @@ function buildBallast(): LevelDef {
   const grid = corridorGrid();
   fill(grid, 30, 12, 34, 12); // gate shelf: 3 tiles up, a crate's height short of a jump
   fill(grid, 30, 13, 30, 14); // the shelf's near face, which the crate stops against
-  fill(grid, 23, 8, 23, 13); // a wall on the upper left of the monolith
-  fill(grid, 21, 13, 22, 13);
+  fill(grid, 21, 2, 23, 13); // a wall on the upper left of the monolith
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
@@ -144,8 +143,8 @@ function buildBallast(): LevelDef {
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     // Clear of the pad on the far side: the pad has to be reachable without
     // shoving the crate first.
-    boxes: [{ x: 21 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(24, 240)],
-    devices: [pad('chronoporter', 19, 15, PORTER_LABEL)],
+    boxes: [{ x: 22 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(24, 240)],
+    devices: [pad('chronoporter', 15, 15, PORTER_LABEL)],
     hazards: [],
     exit: { x: 32.5 * TILE, y: 12 * TILE - 26, r: 22 },
   };
@@ -164,7 +163,7 @@ function buildCascade(): LevelDef {
   fill(grid, 36, 13, 36, 14); // its near face: where the crate comes to a stop
   fill(grid, 26, 11, 27, 11); // third platform
   fill(grid, 16, 11, 17, 11); // second platform
-  fill(grid, 7, 10, 8, 10); // first platform
+  fill(grid, 1, 10, 8, 10); // first platform
   const map = new TileMap(grid.map((r) => r.join('')));
   return {
     name: 'Cascade',
@@ -183,7 +182,7 @@ function buildCascade(): LevelDef {
       pad('chronoporter', 8, 15, PORTER_LABEL),
     ],
     hazards: [],
-    exit: { x: 4 * TILE, y: 8 * TILE - 26, r: 22 },
+    exit: { x: 4 * TILE, y: 9 * TILE - 26, r: 22 },
   };
 }
 
