@@ -7,7 +7,30 @@ import { sfx } from './audio';
 const ROW_H = 42;
 const TOP = 150;
 const LEFT = 120;
-const WIDTH = VIEW_W - 240;
+const SPAN = VIEW_W - 240;
+const COL_GAP = 16;
+/** The last row has to clear the rule and the prompt under it. */
+const BOTTOM = VIEW_H - 70;
+
+/** How the list is laid out for a given number of levels: down, then across. */
+function layout(count: number): { perCol: number; cols: number; width: number } {
+  const fits = Math.max(1, Math.floor((BOTTOM - TOP) / ROW_H));
+  const cols = Math.max(1, Math.ceil(count / fits));
+  // Share the levels out evenly rather than filling the first column and leaving
+  // the last one a stub.
+  const perCol = Math.ceil(count / cols);
+  return { perCol, cols, width: (SPAN - COL_GAP * (cols - 1)) / cols };
+}
+
+/** Where a level's row sits. */
+function slot(i: number, count: number): { x: number; y: number; w: number } {
+  const { perCol, width } = layout(count);
+  return {
+    x: LEFT + Math.floor(i / perCol) * (width + COL_GAP),
+    y: TOP + (i % perCol) * ROW_H,
+    w: width,
+  };
+}
 
 /** The way into the level editor: press E on the menu and type it. */
 const EDITOR_CODE = '8147';
@@ -50,12 +73,16 @@ export class MenuScene extends Phaser.Scene {
 
     this.rows = LEVELS.map((_, i) => {
       const level = buildLevel(i);
-      return this.add.text(LEFT + 20, TOP + i * ROW_H + 8, `${i + 1}. ${level.name.toUpperCase()}`, {
-        fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#cfd8ff',
-        lineSpacing: 4,
-      });
+      const s = slot(i, LEVELS.length);
+      return this.add
+        .text(s.x + 20, s.y + 8, `${i + 1}. ${level.name.toUpperCase()}`, {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: '#cfd8ff',
+          lineSpacing: 4,
+        })
+        .setFixedSize(s.w - 28, 0)
+        .setWordWrapWidth(s.w - 28);
     });
 
     this.prompt = this.add
@@ -71,12 +98,17 @@ export class MenuScene extends Phaser.Scene {
     kb.on('keydown-DOWN', () => this.move(1));
     kb.on('keydown-W', () => this.move(-1));
     kb.on('keydown-S', () => this.move(1));
+    kb.on('keydown-LEFT', () => this.move(-layout(LEVELS.length).perCol));
+    kb.on('keydown-RIGHT', () => this.move(layout(LEVELS.length).perCol));
+    kb.on('keydown-A', () => this.move(-layout(LEVELS.length).perCol));
+    kb.on('keydown-D', () => this.move(layout(LEVELS.length).perCol));
     kb.on('keydown-ENTER', () => this.play(this.cursor));
     kb.on('keydown-SPACE', () => this.play(this.cursor));
     kb.on('keydown', (e: KeyboardEvent) => {
       if (this.typeCode(e)) return;
-      const n = Number(e.key);
-      if (Number.isInteger(n) && n >= 1 && n <= LEVELS.length) this.play(n - 1);
+      // 1-9 are themselves and 0 is the tenth; past that the cursor is the way in.
+      const n = /^[0-9]$/.test(e.key) ? (e.key === '0' ? 10 : Number(e.key)) : NaN;
+      if (n >= 1 && n <= LEVELS.length) this.play(n - 1);
     });
 
     kb.on('keydown', () => sfx.unlock());
@@ -123,9 +155,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private rowAt(p: Phaser.Input.Pointer): number | null {
-    if (p.x < LEFT || p.x > LEFT + WIDTH) return null;
+    const { perCol, cols, width } = layout(LEVELS.length);
+    const col = Math.floor((p.x - LEFT) / (width + COL_GAP));
+    if (col < 0 || col >= cols) return null;
+    if (p.x > LEFT + col * (width + COL_GAP) + width) return null;
     const row = Math.floor((p.y - TOP) / ROW_H);
-    return row >= 0 && row < LEVELS.length ? row : null;
+    if (row < 0 || row >= perCol) return null;
+    const i = col * perCol + row;
+    return i < LEVELS.length ? i : null;
   }
 
   private move(d: number): void {
@@ -144,17 +181,17 @@ export class MenuScene extends Phaser.Scene {
     g.clear();
     LEVELS.forEach((_, i) => {
       const on = i === this.cursor;
-      const y = TOP + i * ROW_H;
-      g.fillStyle(0x6d4bd6, on ? 0.22 : 0.08).fillRect(LEFT, y, WIDTH, ROW_H - 8);
-      g.lineStyle(1, 0x6d4bd6, on ? 0.9 : 0.3).strokeRect(LEFT, y, WIDTH, ROW_H - 8);
+      const s = slot(i, LEVELS.length);
+      g.fillStyle(0x6d4bd6, on ? 0.22 : 0.08).fillRect(s.x, s.y, s.w, ROW_H - 8);
+      g.lineStyle(1, 0x6d4bd6, on ? 0.9 : 0.3).strokeRect(s.x, s.y, s.w, ROW_H - 8);
       this.rows[i].setColor(on ? '#ffffff' : '#cfd8ff');
       if (on) {
         const pulse = 0.5 + 0.5 * Math.sin(time / 260);
-        g.fillStyle(0xf7e26b, 0.4 + 0.5 * pulse).fillRect(LEFT + 4, y + 6, 4, ROW_H - 18);
+        g.fillStyle(0xf7e26b, 0.4 + 0.5 * pulse).fillRect(s.x + 4, s.y + 6, 4, ROW_H - 18);
       }
     });
 
-    g.fillStyle(0x8892bd, 0.7).fillRect(LEFT, VIEW_H - 52, WIDTH, 1);
+    g.fillStyle(0x8892bd, 0.7).fillRect(LEFT, VIEW_H - 52, SPAN, 1);
     this.prompt.setText(this.code === null ? '' : `editor code ${'*'.repeat(this.code.length)}_`);
   }
 }
