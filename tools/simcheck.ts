@@ -222,7 +222,14 @@ function run(world: World, ticks: number, input: Input = NO_INPUT): void {
 
 /** A level exactly as the game builds it, pads solid to objects included. */
 function levelWorld(level: LevelDef): World {
-  return new World(level.map, level.spawn, level.boxes, level.devices.map((d) => d.rect));
+  return new World(
+    level.map,
+    level.spawn,
+    level.boxes,
+    level.devices.map((d) => d.rect),
+    level.buttons ?? [],
+    level.phase ?? [],
+  );
 }
 
 // 10. Level 1, "Threshold": the monolith blocks the run, and scrubbing back gets you through.
@@ -714,6 +721,38 @@ function levelWorld(level: LevelDef): World {
   w.player.x = 10 * TILE;
   w.updateButtons();
   check('an inverted block closes while its button is held', w.phaseSolids().length === 1);
+}
+
+// 24. Level 6, "Deadweight": the wall stands until something is left in the button.
+{
+  const level = buildLevel(5);
+  const wallX = 26 * TILE;
+
+  const w = levelWorld(level);
+  run(w, 400, { ...NO_INPUT, right: true, jump: true, jumpPressed: true });
+  check(
+    '"Deadweight" cannot simply be walked through',
+    w.player.x + 20 <= wallX + 1,
+    `x=${w.player.x}`,
+  );
+
+  // The intended route: hop over the crate, shove it back into the button, leave it.
+  const w2 = levelWorld(level);
+  for (let i = 0; i < 160; i++) {
+    w2.step({ ...NO_INPUT, right: true, jump: true, jumpPressed: i % 20 === 0 });
+  }
+  run(w2, 135, { ...NO_INPUT, left: true });
+  check('the crate ends up in the button', w2.isPressed(0), `crate x=${w2.boxes[0].state.x}`);
+  check('the wall is open while the crate holds it down', w2.phaseSolids().length === 0);
+
+  for (let i = 0; i < 500; i++) {
+    w2.step({ ...NO_INPUT, right: true, jump: true, jumpPressed: i % 25 === 0 });
+  }
+  check(
+    '"Deadweight" is completable by leaving the crate on the button',
+    w2.player.x > level.exit.x - 30,
+    `x=${w2.player.x} exit=${level.exit.x}`,
+  );
 }
 
 if (failures.length > 0) throw new Error(`${failures.length} simulation check(s) failed: ${failures.join(', ')}`);

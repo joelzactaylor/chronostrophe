@@ -268,12 +268,41 @@ function buildLift(): LevelDef {
   };
 }
 
+/**
+ * "Deadweight" — the introduction to buttons. The gate is behind an orange wall
+ * that stands while the button on the floor is up, and the button is far enough
+ * from the wall that standing in it yourself gets you nothing: the way through is
+ * open only while you are not the thing holding it open. The crate is the answer —
+ * shove it into the button and leave it there — and a former self left standing in
+ * the button on a rewound clock does the same job.
+ */
+function buildDeadweight(): LevelDef {
+  const grid = corridorGrid();
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Deadweight',
+    brief: 'Something has to stay on the button.',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    // The weight: it starts to the right of the button, so it is shoved back into it.
+    boxes: [{ x: 12 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 18, 15, PORTER_LABEL)],
+    buttons: [button(8, 15, 0)],
+    // Too tall to jump and the only way to the gate: open only while the button is held.
+    phase: phaseBlocks(0, 26, 9, 26, 14),
+    hazards: [],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
   buildBallast,
   buildCascade,
   buildLift,
+  buildDeadweight,
 ];
 
 export function buildLevel(index = 0): LevelDef {
