@@ -458,6 +458,14 @@ export class GameScene extends Phaser.Scene {
     return this.anomalies.map((a) => this.livedPath[a.idx]).filter((s): s is LivedStep => !!s);
   }
 
+  /** The timeline tick each anomaly currently occupies, for HUD markers. */
+  anomalyTimelineTicks(): number[] {
+    return this.anomalies
+      .map((a) => this.livedPath[a.idx])
+      .filter((s): s is LivedStep => !!s)
+      .map((s) => s.tick);
+  }
+
   // ---------------------------------------------------------------- fails
 
   private fail(kind: 'death' | 'dust' | 'fisheye', why: string): void {

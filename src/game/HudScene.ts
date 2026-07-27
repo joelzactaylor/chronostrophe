@@ -157,11 +157,18 @@ export class HudScene extends Phaser.Scene {
     g.lineStyle(1, 0x6d4bd6, overMenu ? 0.9 : 0.55).strokeRect(MENU.x, MENU.y, MENU.w, MENU.h);
     this.menu.setColor(overMenu ? '#ffffff' : '#b9c3ea');
 
-    // recorded history coverage
+    // Track background (drawn first so coloured segments sit on top)
+    g.fillStyle(0x1b1436, 1).fillRect(TRACK_X, TRACK_Y - 3, TRACK_W, 6);
+    for (let i = 0; i <= 12; i++) {
+      const x = TRACK_X + (i / 12) * TRACK_W;
+      g.fillStyle(0x38306a, 1).fillRect(x, TRACK_Y - 8, 1, 16);
+    }
+
+    // recorded history coverage (drawn on top of the track)
     for (const run of w.runs) {
       const a = TRACK_X + (run.tMin / TICKS) * TRACK_W;
       const b = TRACK_X + (run.tMax / TICKS) * TRACK_W;
-      g.fillStyle(0x76d9ff, 0.35).fillRect(a, TRACK_Y - 12, Math.max(2, b - a), 5);
+      g.fillStyle(0x76d9ff, 0.35).fillRect(a, TRACK_Y - 2, Math.max(2, b - a), 5);
     }
     const cur = w.current;
     if (cur.tMax > cur.tMin) {
@@ -171,14 +178,31 @@ export class HudScene extends Phaser.Scene {
       // recorded segment is all past — shown in blue like closed runs, not
       // yellow like an active present.
       const color = w.paused ? 0x76d9ff : 0xf7e26b;
-      g.fillStyle(color, w.paused ? 0.35 : 0.5).fillRect(a, TRACK_Y - 12, Math.max(2, b - a), 5);
+      g.fillStyle(color, w.paused ? 0.35 : 0.5).fillRect(a, TRACK_Y - 2, Math.max(2, b - a), 5);
     }
 
-    g.fillStyle(0x1b1436, 1).fillRect(TRACK_X, TRACK_Y - 3, TRACK_W, 6);
-    for (let i = 0; i <= 12; i++) {
-      const x = TRACK_X + (i / 12) * TRACK_W;
-      g.fillStyle(0x38306a, 1).fillRect(x, TRACK_Y - 8, 1, 16);
+    // Monolith-fall markers: a small grey square above the track, one per
+    // immovable box that drops at a set tick.
+    for (const box of w.boxes) {
+      if (!box.immovable || box.releaseTick <= 0) continue;
+      const mx = TRACK_X + (box.releaseTick / TICKS) * TRACK_W;
+      g.fillStyle(0x888888, 1.0).fillRect(mx - 4, TRACK_Y - 22, 8, 8);
     }
+
+    // Anomaly markers: pulsing diamond shapes below the track, one per anomaly
+    // currently chasing the player, drawn at the timeline tick they occupy so it
+    // reads as where the contradiction is.
+    const anomalyTicks = scene.anomalyTimelineTicks();
+    const anomalyPulse = 0.55 + 0.45 * Math.sin(this.time.now / 180);
+    for (const tick of anomalyTicks) {
+      const ax = TRACK_X + (tick / TICKS) * TRACK_W;
+      g.fillStyle(0xff4d6d, 0.35 + 0.4 * anomalyPulse);
+      g.fillTriangle(ax, TRACK_Y + 14, ax - 5, TRACK_Y + 22, ax + 5, TRACK_Y + 22);
+      g.fillTriangle(ax, TRACK_Y + 30, ax - 5, TRACK_Y + 22, ax + 5, TRACK_Y + 22);
+      g.fillStyle(0xff4d6d, 0.2 * anomalyPulse);
+      g.fillCircle(ax, TRACK_Y + 22, 3 + 4 * anomalyPulse);
+    }
+
     g.fillStyle(0xf43f5e, 0.9).fillRect(TRACK_X - 3, TRACK_Y - 12, 3, 24);
     g.fillStyle(0xf43f5e, 0.9).fillRect(TRACK_X + TRACK_W, TRACK_Y - 12, 3, 24);
 
@@ -217,9 +241,10 @@ export class HudScene extends Phaser.Scene {
     if (lead === null) {
       this.anomaly.setText('');
     } else {
-      const left = (lead / 60).toFixed(2);
+      const left = (lead / 120).toFixed(2);
       this.anomaly.setText(`ANOMALY CLOSING — ${left}s OF YOUR OWN PATH LEFT`);
-      this.anomaly.setColor(lead < 120 ? '#ffffff' : '#ff8fa3');
+      const urgency = 1 - Math.min(1, lead / 120);
+      this.anomaly.setColor(`hsl(350, 100%, ${50 + 25 * (1 - urgency)}%)`);
     }
 
     this.drawOverlay(scene);
