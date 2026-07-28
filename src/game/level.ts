@@ -434,6 +434,56 @@ function buildEscapement(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildSkyscraper(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 31, 3, 32, 3);
+  fill(grid, 31, 4, 42, 4);
+  fill(grid, 14, 5, 18, 5);
+  fill(grid, 31, 5, 32, 5);
+  fill(grid, 31, 6, 32, 6);
+  fill(grid, 13, 7, 18, 7);
+  fill(grid, 31, 7, 32, 7);
+  fill(grid, 35, 7, 35, 7);
+  fill(grid, 40, 7, 40, 7);
+  fill(grid, 31, 8, 32, 8);
+  fill(grid, 36, 8, 36, 8);
+  fill(grid, 39, 8, 39, 8);
+  fill(grid, 12, 9, 18, 9);
+  fill(grid, 31, 9, 32, 9);
+  fill(grid, 37, 9, 37, 9);
+  fill(grid, 31, 10, 32, 10);
+  fill(grid, 38, 10, 38, 10);
+  fill(grid, 11, 11, 18, 11);
+  fill(grid, 31, 11, 32, 11);
+  fill(grid, 36, 11, 36, 11);
+  fill(grid, 39, 11, 39, 11);
+  fill(grid, 31, 12, 32, 12);
+  fill(grid, 35, 12, 35, 12);
+  fill(grid, 40, 12, 40, 12);
+  fill(grid, 10, 13, 18, 13);
+  fill(grid, 31, 13, 32, 13);
+  fill(grid, 31, 14, 32, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Skyscraper',
+    brief: '',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 16 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 11 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 6, 15, 'CHRONOPORTER')],
+    buttons: [],
+    phase: [],
+    hazards: [{ x: 33 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 35.5 * TILE, y: 3 * TILE - 26, r: 22 },
+  };
+}
+
 // /**  */
 // function buildSwitchback(): LevelDef {
 //   const grid = blankGrid();
@@ -588,6 +638,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildLiveweight,
   buildOneTwo,
   buildEscapement,
+  buildSkyscraper,
   //buildSwitchback,
   //buildServant,
   //buildGroups,
