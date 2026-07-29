@@ -484,6 +484,96 @@ function buildSkyscraper(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildStages(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 16, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 15); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
+  fill(grid, 22, 1, 22, 1);
+  fill(grid, 5, 2, 9, 2);
+  fill(grid, 22, 2, 22, 2);
+  fill(grid, 1, 3, 1, 3);
+  fill(grid, 5, 3, 9, 3);
+  fill(grid, 14, 3, 19, 3);
+  fill(grid, 22, 3, 22, 3);
+  fill(grid, 5, 4, 5, 4);
+  fill(grid, 22, 4, 22, 4);
+  fill(grid, 4, 5, 5, 5);
+  fill(grid, 22, 5, 22, 5);
+  fill(grid, 5, 6, 5, 6);
+  fill(grid, 14, 6, 22, 6);
+  fill(grid, 1, 7, 1, 7);
+  fill(grid, 5, 7, 5, 7);
+  fill(grid, 5, 8, 5, 8);
+  fill(grid, 4, 9, 9, 9);
+  fill(grid, 14, 9, 19, 9);
+  fill(grid, 5, 10, 5, 10);
+  fill(grid, 1, 11, 1, 11);
+  fill(grid, 5, 11, 5, 11);
+  fill(grid, 5, 12, 5, 12);
+  fill(grid, 4, 13, 9, 13);
+  fill(grid, 14, 13, 22, 13);
+  fill(grid, 5, 14, 5, 14);
+  fill(grid, 9, 14, 9, 14);
+  fill(grid, 14, 14, 14, 14);
+  fill(grid, 22, 14, 22, 14);
+  fill(grid, 1, 15, 5, 15);
+  fill(grid, 9, 15, 14, 15);
+  fill(grid, 22, 15, 26, 15);
+  fill(grid, 31, 15, 42, 15);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Stages',
+    brief: '',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 8 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, { x: 29 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, monolith(10, 0)],
+    devices: [pad('chronoporter', 8, 2, 'CHRONOPORTER'), pad('anachroverter', 37, 15, 'ANACHROVERTER')],
+    buttons: [button(6, 2, 0), button(7, 13, 3), button(18, 13, 2), button(18, 3, 1), button(17, 3, 2)],
+    phase: [...phaseBlocks(0, 10, 6, 13, 6, true), ...phaseBlocks(1, 10, 9, 13, 9), ...phaseBlocks(2, 10, 12, 13, 12), ...phaseBlocks(3, 22, 12, 22, 12), ...phaseBlocks(3, 22, 11, 22, 11), ...phaseBlocks(3, 22, 10, 22, 10), ...phaseBlocks(3, 22, 9, 22, 9), ...phaseBlocks(3, 22, 8, 22, 8), ...phaseBlocks(3, 22, 7, 22, 7), ...phaseBlocks(1, 27, 6, 30, 6), ...phaseBlocks(2, 31, 6, 41, 6, true)],
+    hazards: [{ x: 22 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 6 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 15 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 2 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 2 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 39.5 * TILE, y: 6 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildSpring(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 31, 6, 33, 6);
+  fill(grid, 31, 7, 33, 7);
+  fill(grid, 31, 8, 33, 8);
+  fill(grid, 27, 9, 29, 9);
+  fill(grid, 27, 10, 29, 10);
+  fill(grid, 27, 11, 29, 11);
+  fill(grid, 8, 12, 10, 12);
+  fill(grid, 23, 12, 25, 12);
+  fill(grid, 8, 13, 10, 13);
+  fill(grid, 23, 13, 25, 13);
+  fill(grid, 8, 14, 10, 14);
+  fill(grid, 23, 14, 25, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Spring',
+    brief: '',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [],
+    devices: [],
+    buttons: [],
+    phase: [],
+    hazards: [{ x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    springs: [spring(6, 15), spring(15, 15), spring(21, 15), spring(24, 12), spring(28, 9), spring(32, 6)],
+    exit: { x: 38.5 * TILE, y: 8 * TILE - 26, r: 22 },
+  };
+}
+
 // /**  */
 // function buildSwitchback(): LevelDef {
 //   const grid = blankGrid();
@@ -639,6 +729,8 @@ export const LEVELS: (() => LevelDef)[] = [
   buildOneTwo,
   buildEscapement,
   buildSkyscraper,
+  buildStages,
+  buildSpring,
   //buildSwitchback,
   //buildServant,
   //buildGroups,
