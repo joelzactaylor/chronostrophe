@@ -146,8 +146,8 @@ still a crush, and still kills.
 
 ## The in-game editor
 
-Press `E` on the menu and type the editor code `8147`. The editor draws the same data a level
-function holds, so anything you draw can be played at once and printed as that function's source.
+The editor draws the same data a level function holds, so anything you draw can be played at once
+and printed as that function's source.
 
 | | |
 |---|---|

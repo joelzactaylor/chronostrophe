@@ -6,6 +6,7 @@ import { FISHEYE_KEY, FisheyePipeline } from './fisheye';
 import { fadeIn, fadeOutThen } from './transition';
 import { sfx } from './audio';
 import { groupColour, mixColor, shade, tint } from './palette';
+import { markLevelComplete } from './progress';
 
 export type GameState = 'play' | 'death' | 'dust' | 'fisheye' | 'won';
 
@@ -375,6 +376,7 @@ export class GameScene extends Phaser.Scene {
     if (rectsOverlap(pr, { x: ex.x - ex.r, y: ex.y - ex.r, w: ex.r * 2, h: ex.r * 2 })) {
       this.state = 'won';
       this.message = 'TIMELINE RESOLVED';
+      if (this.draft === null) markLevelComplete(this.levelIndex);
       this.beginCapture();
       return;
     }
