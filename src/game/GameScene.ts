@@ -359,6 +359,9 @@ export class GameScene extends Phaser.Scene {
     for (const h of this.level.hazards) {
       if (rectsOverlap(pr, h)) return this.fail('death', 'KILLED BY HAZARD');
     }
+    for (const h of this.level.hazardsInverted) {
+      if (rectsOverlap(pr, h)) return this.fail('death', 'KILLED BY HAZARD');
+    }
     for (const box of world.boxes) {
       const br = boxRect(box);
       const crushed = rectsOverlap(pr, { x: br.x + 3, y: br.y + 3, w: br.w - 6, h: br.h - 6 });
@@ -624,6 +627,7 @@ export class GameScene extends Phaser.Scene {
     this.drawButtons(g);
     this.drawSprings(g);
     this.drawHazards(g);
+    this.drawHazardsInverted(g);
     this.drawExit(g);
     for (const box of this.world.boxes) this.drawBox(g, box);
     this.drawDevices(g);
@@ -734,6 +738,18 @@ export class GameScene extends Phaser.Scene {
         g.fillTriangle(x, h.y + h.h, x + 5, h.y, x + 10, h.y + h.h);
       }
       g.fillStyle(0x3a4568, 1).fillRect(h.x, h.y + h.h - 3, h.w, 3);
+    }
+  }
+
+  private drawHazardsInverted(g: Phaser.GameObjects.Graphics): void {
+    for (const h of this.level.hazardsInverted) {
+      const spikes = Math.floor(h.w / 10);
+      for (let i = 0; i < spikes; i++) {
+        const x = h.x + i * 10;
+        g.fillStyle(COL_SPIKE, 1);
+        g.fillTriangle(x, h.y, x + 5, h.y + h.h, x + 10, h.y);
+      }
+      g.fillStyle(0x3a4568, 1).fillRect(h.x, h.y, h.w, 3);
     }
   }
 
@@ -860,10 +876,7 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0x05030a, 0.4 * (1 - drop));
       g.fillEllipse(r.x + r.w / 2, floorY + 1, r.w * (1.1 - drop * 0.5), 6);
     }
-    const pulse = 0.35 + 0.15 * Math.sin(this.time.now / 160);
-    g.lineStyle(3, COL_PLAYER, pulse).strokeRect(r.x - 5, r.y - 5, r.w + 10, r.h + 10);
     this.drawBody(g, p, COL_PLAYER, 1);
-    g.fillStyle(0xffffff, 0.9).fillRect(r.x + r.w / 2 - 2, r.y - 12, 4, 6);
   }
 
   /** The body on its way in: the same body, drawn smaller and dimmer each frame. */

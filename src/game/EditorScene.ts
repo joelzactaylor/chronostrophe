@@ -20,7 +20,6 @@ type Tool =
   | 'hazard'
   | 'button'
   | 'phase'
-  | 'phaseInv'
   | 'spring';
 
 const TOOLS: { tool: Tool; key: string; label: string }[] = [
@@ -36,7 +35,6 @@ const TOOLS: { tool: Tool; key: string; label: string }[] = [
   { tool: 'hazard', key: '0', label: 'SPIKES' },
   { tool: 'button', key: 'B', label: 'BUTTON' },
   { tool: 'phase', key: 'P', label: 'PHASE' },
-  { tool: 'phaseInv', key: 'O', label: 'PHASE-INV' },
   { tool: 'spring', key: 'S', label: 'SPRING' },
 ];
 
@@ -62,6 +60,7 @@ export class EditorScene extends Phaser.Scene {
   private overlay: HTMLDivElement | null = null;
   private painting = false;
   private hover: { cx: number; cy: number } | null = null;
+  private shiftDown = false;
 
   constructor() {
     super('editor');
@@ -98,7 +97,17 @@ export class EditorScene extends Phaser.Scene {
 
   private bindKeys(): void {
     const kb = this.input.keyboard!;
-    for (const t of TOOLS) kb.on(`keydown-${t.key === '0' ? 'ZERO' : keyName(t.key)}`, () => this.pick(t.tool));
+    kb.on('keydown-SHIFT', () => {
+      this.shiftDown = true;
+    });
+    kb.on('keyup-SHIFT', () => {
+      this.shiftDown = false;
+    });
+    for (const t of TOOLS) {
+      kb.on(`keydown-${t.key === '0' ? 'ZERO' : keyName(t.key)}`, () => {
+        this.pick(t.tool);
+      });
+    }
     kb.on('keydown-G', () => (this.group = (this.group + 1) % GROUP_COLOURS.length));
     kb.on('keydown-OPEN_BRACKET', () => (this.tick = Math.max(0, this.tick - 30)));
     kb.on('keydown-CLOSED_BRACKET', () => (this.tick = Math.min(3600, this.tick + 30)));
@@ -182,7 +191,11 @@ export class EditorScene extends Phaser.Scene {
         d.pads.push({ kind: this.tool as DeviceKind, cx, row });
         break;
       case 'hazard':
-        d.hazards.push({ cx, cy });
+        if (this.shiftDown) {
+          d.hazardsInverted.push({ cx, cy });
+        } else {
+          d.hazards.push({ cx, cy });
+        }
         break;
       case 'spring':
         d.springs.push({ cx, row });
@@ -191,8 +204,7 @@ export class EditorScene extends Phaser.Scene {
         d.buttons.push({ cx, row, group: this.group });
         break;
       case 'phase':
-      case 'phaseInv':
-        d.phase.push({ cx, cy, group: this.group, inverted: this.tool === 'phaseInv' });
+        d.phase.push({ cx, cy, group: this.group, inverted: this.shiftDown });
         break;
     }
   }
@@ -206,15 +218,17 @@ export class EditorScene extends Phaser.Scene {
   /** Removes whatever occupies a tile, walls last: one click, one thing gone. */
   private clearTile(cx: number, cy: number): void {
     const d = this.draft;
-    const before = [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length, d.springs.length];
+    const counts = () => [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length, d.hazardsInverted.length, d.springs.length];
+    const before = counts();
     d.crates = d.crates.filter((c) => !(c.cx === cx && c.row === cy + 1));
     d.monoliths = d.monoliths.filter((m) => !(cx >= m.cx && cx < m.cx + 4 && cy >= 2 && cy < 5));
     d.pads = d.pads.filter((p) => !(p.cx === cx && p.row === cy + 1));
     d.buttons = d.buttons.filter((b) => !(b.cx === cx && b.row === cy + 1));
     d.phase = d.phase.filter((p) => !(p.cx === cx && p.cy === cy));
     d.hazards = d.hazards.filter((h) => !(h.cx === cx && h.cy === cy));
+    d.hazardsInverted = d.hazardsInverted.filter((h) => !(h.cx === cx && h.cy === cy));
     d.springs = d.springs.filter((sp) => !(sp.cx === cx && sp.row === cy + 1));
-    const after = [d.crates.length, d.monoliths.length, d.pads.length, d.buttons.length, d.phase.length, d.hazards.length, d.springs.length];
+    const after = counts();
     if (before.every((n, i) => n === after[i])) this.setWall(cx, cy, false);
   }
 
@@ -323,6 +337,14 @@ export class EditorScene extends Phaser.Scene {
       }
     }
 
+    for (const h of d.hazardsInverted) {
+      g.fillStyle(0x93a2c4, 0.9);
+      for (let i = 0; i < 4; i++) {
+        const x = h.cx * TILE + i * 8;
+        g.fillTriangle(x, h.cy * TILE, x + 8, h.cy * TILE, x + 4, (h.cy + 1) * TILE);
+      }
+    }
+
     for (const sp of d.springs) {
       const y = sp.row * TILE - 12;
       g.fillStyle(0x9be36a, 1).fillRect(sp.cx * TILE, y, TILE, 3);
@@ -372,14 +394,20 @@ export class EditorScene extends Phaser.Scene {
       const x = 8 + (i % 7) * 134;
       const y = 6 + Math.floor(i / 7) * 18;
       g.fillStyle(0x6d4bd6, on ? 0.3 : 0.06).fillRect(x, y, 130, 17);
+      let label = t.label;
+      if (this.shiftDown) {
+        if (t.tool === 'hazard') label = 'INV SPIKES';
+        else if (t.tool === 'phase') label = 'INV PHASE';
+      }
+      this.toolTexts[i].setText(`[${t.key}] ${label}`);
       this.toolTexts[i].setColor(on ? '#ffffff' : '#cfd8ff');
     });
     const c = groupColour(this.group);
     g.fillStyle(c, 0.9).fillRect(VIEW_W - 26, 8, 14, 14);
     this.status.setText(
       `${this.draft.name.toUpperCase()}   [F2] rename   [G] group ${this.group}   ` +
-        `[ ] monolith tick ${this.tick}   [T] test   [X] export   [N] clear   [ESC] menu\n` +
-        'left click places, right click clears the tile',
+      `[ ] monolith tick ${this.tick}   [T] test   [X] export   [N] clear   [ESC] menu\n` +
+      `left click places, right click clears the tile   [SHIFT]${this.shiftDown ? ' INVERTED' : ' inverted variants'}`,
     );
   }
 }

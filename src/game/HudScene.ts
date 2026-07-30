@@ -186,7 +186,7 @@ export class HudScene extends Phaser.Scene {
     for (const box of w.boxes) {
       if (!box.immovable || box.releaseTick <= 0) continue;
       const mx = TRACK_X + (box.releaseTick / TICKS) * TRACK_W;
-      g.fillStyle(0x888888, 1.0).fillRect(mx - 4, TRACK_Y - 22, 8, 8);
+      g.fillStyle(0x888888, 1.0).fillRect(mx - 4, TRACK_Y - 14, 8, 8);
     }
 
     // Anomaly markers: pulsing diamond shapes below the track, one per anomaly

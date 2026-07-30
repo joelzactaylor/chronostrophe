@@ -127,7 +127,12 @@ export function moveY(rect: Rect, dy: number, map: TileMap, solids: SolidRect[])
  * exactly one of four displacements, so all four are tried in order of length and
  * the first that lands clear is taken.
  */
-export function depenetrate(rect: Rect, map: TileMap, solids: SolidRect[]): MoveResult {
+export function depenetrate(
+  rect: Rect,
+  map: TileMap,
+  solids: SolidRect[],
+  preferredAxis: 'horizontal' | 'vertical' | 'both' = 'both',
+): MoveResult {
   const res: MoveResult = { hit: false, hitId: GROUND_NONE, correction: 0 };
 
   for (let pass = 0; pass < 4; pass++) {
@@ -144,14 +149,23 @@ export function depenetrate(rect: Rect, map: TileMap, solids: SolidRect[]): Move
       { dx: other.x + other.w - rect.x + EPS, dy: 0 },
       { dx: 0, dy: other.y - (rect.y + rect.h) - EPS },
       { dx: 0, dy: other.y + other.h - rect.y + EPS },
-    ].sort((a, b) => Math.abs(a.dx || a.dy) - Math.abs(b.dx || b.dy));
+    ];
+
+    const sortExits = (candidates: { dx: number; dy: number }[]) => {
+      const axisPriority = preferredAxis === 'vertical' ? (e: { dx: number; dy: number }) => (e.dy !== 0 ? 0 : 1) : preferredAxis === 'horizontal' ? (e: { dx: number; dy: number }) => (e.dx !== 0 ? 0 : 1) : () => 0;
+      return candidates.sort((a, b) => {
+        const axisDelta = axisPriority(a) - axisPriority(b);
+        if (axisDelta !== 0) return axisDelta;
+        return Math.abs(a.dx || a.dy) - Math.abs(b.dx || b.dy);
+      });
+    };
 
     const clear = (e: { dx: number; dy: number }): boolean => {
       const moved: Rect = { x: rect.x + e.dx, y: rect.y + e.dy, w: rect.w, h: rect.h };
       if (map.overlapping(moved, scratch).length > 0) return false;
       return !solids.some((s) => rectsOverlap(moved, s));
     };
-    const exit = exits.find(clear) ?? exits[0];
+    const exit = sortExits(exits.slice()).find(clear) ?? exits[0];
 
     rect.x += exit.dx;
     rect.y += exit.dy;

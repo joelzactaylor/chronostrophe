@@ -378,23 +378,33 @@ export class World {
   step(input: Input): void {
     this.updateButtons();
     this.updatePhaseSolids();
+    // Clear any previous tick's spring firing; this tick's springs will set it.
+    this.sprungOn = null;
     const target = clamp(this.now + this.dir, 0, TICKS);
-    const before = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
+    const beforeBoxes = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
 
     if (this.dir === 1) this.stepBoxesForward(target);
     else for (const box of this.boxes) box.state = { ...this.boxStateAt(box, target) };
+
+    const beforePlayerBoxCarry = { x: this.player.x, y: this.player.y };
 
     // Rewinding or live boxes carry whatever rides on them.
     if (this.player.groundedOn >= 0) {
       const idx = this.player.groundedOn;
       const box = this.boxes[idx];
       if (box) {
-        this.player.x += box.state.x - before[idx].x;
-        this.player.y += box.state.y - before[idx].y;
+        this.player.x += box.state.x - beforeBoxes[idx].x;
+        this.player.y += box.state.y - beforeBoxes[idx].y;
       }
     }
 
+    const afterPlayerBoxCarry = { x: this.player.x, y: this.player.y };
+    this.carryBoxesBySupport(beforeBoxes, beforePlayerBoxCarry, afterPlayerBoxCarry);
+
+    const beforeBoxesPlayerStep = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
+    const beforePlayerStep = { x: this.player.x, y: this.player.y };
     this.stepPlayer(input);
+    this.carryBoxesBySupport(beforeBoxesPlayerStep, beforePlayerStep, { x: this.player.x, y: this.player.y });
     this.now = target;
     this.recordPlayer();
   }
@@ -411,6 +421,67 @@ export class World {
     this.stepPlayer(input);
   }
 
+  /**
+   * Boxes that are resting on another object inherit that object's movement delta.
+   * This lets crates ride the live player, and it also keeps crates riding on top
+   * of other crates or monoliths in sync with the support they sit on.
+   */
+  private carryBoxesBySupport(beforeBoxes: Array<{ x: number; y: number }>, beforePlayer: { x: number; y: number }, afterPlayer: { x: number; y: number }): void {
+    const playerDx = afterPlayer.x - beforePlayer.x;
+    const playerDy = afterPlayer.y - beforePlayer.y;
+    for (const box of this.boxes) {
+      if (box.immovable) continue;
+      const probe: Rect = { x: box.state.x, y: box.state.y + box.h - 2, w: box.w, h: 4 };
+      let supportDx = 0;
+      let supportDy = 0;
+
+      if (playerDx !== 0 || playerDy !== 0) {
+        const r = playerRect(this.player);
+        const supportsPlayer = rectsOverlap(probe, r) && r.y >= box.state.y + box.h - 4 && r.y <= box.state.y + box.h + 4;
+        if (supportsPlayer) {
+          supportDx = playerDx;
+          supportDy = playerDy;
+        }
+      }
+
+      if (supportDx === 0 && supportDy === 0) {
+        for (const other of this.boxes) {
+          if (other === box) continue;
+          const r = boxRect(other);
+          const supportsBox = rectsOverlap(probe, r) && r.y >= box.state.y + box.h - 4 && r.y <= box.state.y + box.h + 4;
+          if (!supportsBox) continue;
+          const before = beforeBoxes[other.id];
+          if (!before) continue;
+          const dx = other.state.x - before.x;
+          const dy = other.state.y - before.y;
+          if (dx !== 0 || dy !== 0) {
+            supportDx = dx;
+            supportDy = dy;
+            break;
+          }
+        }
+      }
+
+      if (supportDx !== 0 || supportDy !== 0) {
+        box.state.x += supportDx;
+        box.state.y += supportDy;
+        // Ensure the box isn't pushed into terrain or other solids by the
+        // support movement.  This prevents a crate riding the player from
+        // being carried through a wall when the player walks into one.
+        const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
+        const solids = this.boxes
+          .filter((o) => o !== box)
+          .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
+          .concat(this.deviceSolids, this.phaseSolids(), this.springs);
+        depenetrate(rect, this.map, solids, 'both');
+        moveX(rect, 0, this.map, solids);
+        moveY(rect, 0, this.map, solids);
+        box.state.x = rect.x;
+        box.state.y = rect.y;
+      }
+    }
+  }
+
   private otherBoxSolids(box: Box): SolidRect[] {
     return this.boxes
       .filter((o) => o !== box)
@@ -418,14 +489,46 @@ export class World {
       .concat(this.deviceSolids, this.phaseSolids(), this.springs);
   }
 
+  private boxDirectlyRidesGhost(box: Box, ghostRect: Rect): boolean {
+    const rect = boxRect(box);
+    const overlapX = rect.x + 1 < ghostRect.x + ghostRect.w && rect.x + rect.w - 1 > ghostRect.x;
+    const bottom = rect.y + rect.h;
+    const onTop = bottom <= ghostRect.y + 4 && bottom >= ghostRect.y - 4;
+    return overlapX && onTop;
+  }
+
+  private boxSupportsBox(support: Box, box: Box): boolean {
+    const supportRect = boxRect(support);
+    const rect = boxRect(box);
+    const overlapX = rect.x + 1 < supportRect.x + supportRect.w && rect.x + rect.w - 1 > supportRect.x;
+    const bottom = rect.y + rect.h;
+    const onTop = bottom <= supportRect.y + 4 && bottom >= supportRect.y - 4;
+    return overlapX && onTop;
+  }
+
+  private boxRidesGhostChain(box: Box, ghostRect: Rect, seen = new Set<number>()): boolean {
+    if (seen.has(box.id)) return false;
+    seen.add(box.id);
+    if (this.boxDirectlyRidesGhost(box, ghostRect)) return true;
+    for (const other of this.boxes) {
+      if (other === box || other.immovable || seen.has(other.id)) continue;
+      if (this.boxSupportsBox(other, box) && this.boxRidesGhostChain(other, ghostRect, seen)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Applies the motion of every recorded body to the objects it touches on the
-   * way from `now` to `target`: a crate standing on a ghost travels with it, and
-   * a crate in the way of one gets shoved aside. At most one recorded body acts on
-   * a given object per tick, so overlapping ghosts never fight over a crate.
+   * way from `now` to `target`: a crate directly resting on a ghost travels with
+   * it, and a crate in the way of one gets shoved aside. At most one recorded
+   * body acts on a given object per tick, so overlapping ghosts never fight over a
+   * crate.
    */
-  private applyGhostMotion(target: number): void {
+  private applyGhostMotion(target: number): Set<number> {
     const claimed = new Set<number>();
+    const carried = new Set<number>();
     for (const run of this.runs) {
       const prev = run.states[this.now];
       const next = run.states[target];
@@ -441,12 +544,12 @@ export class World {
         if (claimed.has(box.id) || target < box.releaseTick) continue;
         const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         const others = this.otherBoxSolids(box);
-        const riding =
-          Math.abs(rect.y + rect.h - pr.y) <= 2 && rect.x < pr.x + pr.w && rect.x + rect.w > pr.x;
+        const riding = this.boxRidesGhostChain(box, pr);
         if (riding) {
           moveX(rect, dx, this.map, others);
           moveY(rect, dy, this.map, others);
           claimed.add(box.id);
+          carried.add(box.id);
         } else if (rectsOverlap(nr, rect)) {
           if (dx !== 0) {
             const out = dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w);
@@ -456,21 +559,32 @@ export class World {
             moveY(rect, nr.y - EPS - (rect.y + rect.h), this.map, others);
             claimed.add(box.id);
           }
+          // After shoving the crate out of the ghost's way, ensure it hasn't
+          // been pushed into terrain or other solids.  The discrete moveX/moveY
+          // can leave the crate overlapping a wall at the edge of the shove.
+          depenetrate(rect, this.map, others, 'both');
         }
         box.state.x = rect.x;
         box.state.y = rect.y;
       }
     }
+    return carried;
   }
 
   private stepBoxesForward(target: number): void {
     const all = this.boxes;
-    this.applyGhostMotion(target);
+    const carried = this.applyGhostMotion(target);
     const ghosts = this.ghostSolidsAt(target);
-    for (const box of all) {
+    const ordered = [...all].sort((a, b) => a.state.y - b.state.y || a.state.x - b.state.x);
+    for (const box of ordered) {
       // Held objects are pinned where the level suspended them until their tick.
       if (target < box.releaseTick) {
         box.state = { ...box.initial };
+        continue;
+      }
+      if (carried.has(box.id)) {
+        box.state.vy = 0;
+        box.state.vx = 0;
         continue;
       }
       box.state.vy = Math.min(box.state.vy + GRAVITY * DT, 900);
@@ -483,15 +597,27 @@ export class World {
           .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
           .concat(this.phaseSolids(), this.springs)
         : [...this.otherBoxSolids(box), ...ghosts];
-      if (!box.immovable) depenetrate(rect, this.map, others);
+      if (!box.immovable) depenetrate(rect, this.map, others, 'both');
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);
-      if (v.groundedOn !== GROUND_NONE || v.ceiling) box.state.vy = 0;
+      // If the box landed on something stop its vertical velocity. If it
+      // landed on a spring, bounce it upward instead and record the spring
+      // for the world's sprungOn (so the scene can draw and sound it).
+      if (v.groundedOn === SPRING_SOLID && !box.immovable && box.state.vy >= 0) {
+        // Bounce the box off the spring.
+        box.state.vy = SPRING_VEL;
+        // Record which spring fired so the scene can react to it. Prefer the
+        // spring that overlaps the box's final rect.
+        const sp = this.springs.find((s) => rectsOverlap(rect, s)) ?? null;
+        this.sprungOn = sp;
+      } else if (v.groundedOn !== GROUND_NONE || v.ceiling) {
+        box.state.vy = 0;
+      }
       box.state.x = rect.x;
       box.state.y = rect.y;
       box.state.vx = 0;
     }
-    for (const box of all) {
+    for (const box of ordered) {
       // When simulation resumes after a scrub past recordedMax (e.g. stepping off
       // a chronoporter), the skipped ticks were never filled in.  Backfill the gap
       // with the last known state so scrubbing backwards lands on consistent data.
@@ -562,13 +688,15 @@ export class World {
       if (hx.hitId >= 0 && this.dir === 1) this.pushBox(this.boxes[hx.hitId], Math.sign(p.vx), rect);
       p.vx = 0;
     }
-    const hy = moveY(rect, p.vy * DT, this.map, this.solids());
+    const movedSolids = this.solids();
+    const postPushDep = depenetrate(rect, this.map, movedSolids);
+    const hy = moveY(rect, p.vy * DT, this.map, movedSolids);
     if (hy.groundedOn !== GROUND_NONE) p.vy = 0;
     if (hy.ceiling) p.vy = 0;
     // A spring is open to the body — walking into one is not walking into a wall —
-    // and throws it the moment it touches, however it arrived.
-    this.sprungOn = null;
-    const sprung = p.vy >= 0 ? (this.springs.find((sp) => rectsOverlap(rect, sp)) ?? null) : null;
+    // and throws it the moment it touches, however it arrived — unless the body
+    // is crouching, in which case the spring stays compressed.
+    const sprung = p.vy >= 0 && !p.ducking ? (this.springs.find((sp) => rectsOverlap(rect, sp)) ?? null) : null;
     if (sprung) {
       p.vy = SPRING_VEL;
       p.groundedOn = GROUND_NONE;
@@ -577,7 +705,7 @@ export class World {
       this.sprungOn = sprung;
       this.springing = true;
     }
-    if (Math.max(dp.correction, hx.correction, hy.correction) > PLAYER_W) this.crushed = true;
+    if (Math.max(dp.correction, hx.correction, hy.correction, postPushDep.correction) > PLAYER_W) this.crushed = true;
     p.x = rect.x;
     p.y = rect.y;
     p.groundedOn = this.sprungOn
@@ -590,11 +718,49 @@ export class World {
   /** The player is weightless but can shove live boxes sideways. */
   private pushBox(box: Box, dirSign: number, playerRectAfter: Rect): void {
     if (!box || dirSign === 0 || box.immovable) return;
-    const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
-    moveX(rect, dirSign * BOX_PUSH_SPEED * DT, this.map, this.otherBoxSolids(box));
-    box.state.x = rect.x;
-    playerRectAfter.x =
-      dirSign > 0 ? box.state.x - playerRectAfter.w - 0.02 : box.state.x + box.w + 0.02;
+
+    const chain: Box[] = [];
+    const seen = new Set<number>();
+    let current: Box | null = box;
+    while (current && !seen.has(current.id) && !current.immovable) {
+      chain.push(current);
+      seen.add(current.id);
+
+      const currentBox: Box = current;
+      const currentRect = { x: currentBox.state.x, y: currentBox.state.y, w: currentBox.w, h: currentBox.h };
+      const next = this.boxes.find((candidate): boolean => {
+        if (candidate === currentBox || seen.has(candidate.id) || candidate.immovable) return false;
+        const candidateRect = { x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h };
+        const sameRow = Math.abs(candidateRect.y - currentRect.y) < 2;
+        const expectedX = currentRect.x + dirSign * currentRect.w;
+        const alongDirection = dirSign > 0 ? candidateRect.x > currentRect.x : candidateRect.x < currentRect.x;
+        const aligned = Math.abs(candidateRect.x - expectedX) < 2;
+        return sameRow && alongDirection && aligned;
+      });
+      current = next ?? null;
+    }
+
+    if (chain.length === 0) return;
+
+    const front = chain[0];
+    const proposed: Rect = { x: front.state.x + dirSign * BOX_PUSH_SPEED * DT, y: front.state.y, w: front.w, h: front.h };
+    if (rectsOverlap(proposed, playerRectAfter)) {
+      return;
+    }
+
+    const pushDelta = dirSign * BOX_PUSH_SPEED * DT;
+    for (const entry of chain) {
+      const rect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
+      const solids = this.boxes
+        .filter((candidate) => candidate.id !== entry.id)
+        .map((candidate) => ({ x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h, id: candidate.id }))
+        .concat(this.deviceSolids, this.phaseSolids(), this.springs);
+      moveX(rect, pushDelta, this.map, solids);
+      entry.state.x = rect.x;
+      if (entry === front) {
+        playerRectAfter.x = dirSign > 0 ? rect.x - playerRectAfter.w - 0.02 : rect.x + rect.w + 0.02;
+      }
+    }
   }
 
   /**
@@ -619,10 +785,12 @@ export class World {
 
       // A recorded body stood on a crate that is no longer under it. It cannot be
       // standing on air, so the history that put it there is void. Tile support is
-      // never in question: level geometry does not move.
+      // never in question: level geometry does not move. Crates that are still in
+      // direct contact with the ghost are treated as part of the ghost's carried
+      // support chain and are not flagged as a contradiction.
       if (state.groundedOn >= 0) {
         const support = this.boxes[state.groundedOn];
-        if (support && !this.holdsUp(support, g)) {
+        if (support && !this.holdsUp(support, g) && !this.boxRidesGhostChain(support, g)) {
           return { run, tick: this.now, reason: 'a former self is standing on nothing', x: g.x, y: g.y };
         }
       }
@@ -631,7 +799,11 @@ export class World {
         if (!rectsOverlap(g, boxRect(box))) continue;
         const rec = this.boxStateAt(box, this.now);
         const recRect: Rect = { x: rec.x, y: rec.y, w: box.w, h: box.h };
-        if (!rectsOverlap(g, recRect)) {
+        const movedTooFar = Math.hypot(box.state.x - rec.x, box.state.y - rec.y) > PLAYER_W * 0.5;
+        if (!rectsOverlap(g, recRect) && !this.boxRidesGhostChain(box, g)) {
+          if (movedTooFar) {
+            return { run, tick: this.now, reason: 'a crate was displaced by a former self', x: g.x, y: g.y };
+          }
           return { run, tick: this.now, reason: 'a crate is where a former self was', x: g.x, y: g.y };
         }
       }
