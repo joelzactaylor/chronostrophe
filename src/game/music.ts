@@ -33,6 +33,8 @@ class Music {
     private master: GainNode | null = null;
     private menuBuffer: AudioBuffer | null = null;
     private levelBuffer: AudioBuffer | null = null;
+    /** Reverse-ordered copy of the level track, so rewind can play continuously. */
+    private reverseLevelBuffer: AudioBuffer | null = null;
 
     private menuSource: AudioBufferSourceNode | null = null;
     private levelSource: AudioBufferSourceNode | null = null;
@@ -53,8 +55,10 @@ class Music {
     private sourceStartedAt = 0;
     /** ctx.currentTime of the last hard reseek (buffer source restart), used to throttle restarts during scrubbing/reverse. */
     private lastReseekAt = -Infinity;
-    /** The buffer offset used on the most recent seekLevel call, used to detect direction (forward/reverse). */
-    private lastOffset = 0;
+    /** Timeline offset used on the most recent seekLevel call. */
+    private lastTimelineOffset = 0;
+    /** Direction of the timeline track currently playing. */
+    private lastDirection: 1 | -1 = 1;
 
     get isMuted(): boolean {
         return this.muted;
@@ -88,6 +92,7 @@ class Music {
         ]).then(([menu, level]) => {
             this.menuBuffer = menu;
             this.levelBuffer = level;
+            this.reverseLevelBuffer = this.reverseBuffer(level);
             this._initPromise = null;
         });
         return this._initPromise;
@@ -236,9 +241,9 @@ class Music {
     // long, looping gameplay track has real variety instead of the
     // menu's short 4 s loop repeating fifteen times in a row:
     //
-    //   0-10 s   Groove only — pad + bass, no arp (mirrors the menu's
-    //            own opening bars before the arp comes in)
-    //   10-20 s  Phrase A, at the menu's own octave
+    //   0-10 s   The complete core hook: Phrase A, bass, and full beat.
+    //            Most levels resolve here, so this section stands alone.
+    //   10-20 s  Phrase A at a lower octave, keeping contrast after the hook
     //   20-30 s  Phrase B, shifted up an octave, half-time — a
     //            deliberately different contour so it doesn't feel
     //            like a repeat of the last segment
@@ -292,8 +297,8 @@ class Music {
         }
 
         const SEGMENTS: Segment[] = [
-            { arp: null, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: false, hat: false, volume: 0.75 },
-            { arp: ARP_PHRASE_A, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: false, hat: true, volume: 0.9 },
+            { arp: ARP_PHRASE_A, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: true, hat: true, volume: 0.95 },
+            { arp: ARP_PHRASE_A_LOW, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: false, hat: true, volume: 0.85 },
             { arp: ARP_PHRASE_B_HIGH, arpStepLen: stepLen * 2, bassEvery: 2, kick: true, snare: true, hat: true, volume: 0.95 },
             { arp: ARP_THEME, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: true, hat: true, volume: 1.0 },
             { arp: ARP_CLIMAX, arpStepLen: stepLen / 2, bassEvery: 1, kick: true, snare: true, hat: true, volume: 1.15 },
@@ -472,6 +477,21 @@ class Music {
     // ─────────────────────────────────────────────────
     // Playback
     // ─────────────────────────────────────────────────
+    /** Make a backwards-running version once; AudioBufferSourceNode cannot run at a negative rate. */
+    private reverseBuffer(source: AudioBuffer): AudioBuffer {
+        const out = new AudioBuffer({
+            length: source.length,
+            numberOfChannels: source.numberOfChannels,
+            sampleRate: source.sampleRate,
+        });
+        for (let channel = 0; channel < source.numberOfChannels; channel++) {
+            const from = source.getChannelData(channel);
+            const to = out.getChannelData(channel);
+            for (let i = 0; i < from.length; i++) to[i] = from[from.length - 1 - i];
+        }
+        return out;
+    }
+
     async playMenu(): Promise<void> {
         if (this._menuPlaying) return;
         await this.init();
@@ -514,7 +534,8 @@ class Music {
         this._levelPaused = false;
         this.lastSeekTick = 0;
         this.pausedOffset = 0;
-        this.lastOffset = 0;
+        this.lastTimelineOffset = 0;
+        this.lastDirection = 1;
         this.lastReseekAt = ctx.currentTime;
         this.levelSource = ctx.createBufferSource();
         this.levelSource.buffer = this.levelBuffer;
@@ -532,37 +553,31 @@ class Music {
      *
      * A hard reseek (stopping and restarting the buffer source at the
      * new offset) only happens when needed: on a big jump/scrub, or
-     * when the playback direction reverses. Simply comparing elapsed
-     * wall-clock time against the target offset isn't enough during
-     * reverse playback, since a forward-only AudioBufferSourceNode's
-     * "expected" position runs the wrong way — that mismatch was
-     * causing constant reseeking (and the doubled/garbled notes) while
-     * scrubbing backwards. Instead we track the last direction and
-     * force a reseek whenever it flips, and throttle reseeks so we
-     * don't restart the source more than a few times a second.
+     * when the playback direction reverses. Reverse playback uses a
+     * pre-reversed buffer, so its ordinary forward buffer position maps
+     * smoothly to backwards timeline motion without source restarts.
      */
     seekLevel(tick: number): void {
-        if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer) return;
+        if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer || !this.reverseLevelBuffer) return;
         const snapped = Math.round(tick);
         if (snapped === this.lastSeekTick && this.levelSource) return;
 
-        const offset = (snapped / 3600) * 60;
-        const clampedOffset = Math.max(0, Math.min(offset, 59.99));
-        const reversed = clampedOffset < this.lastOffset;
+        const timelineOffset = Math.max(0, Math.min((snapped / 3600) * 60, this.levelBuffer.duration - 0.01));
+        const delta = timelineOffset - this.lastTimelineOffset;
+        const direction: 1 | -1 = delta < 0 ? -1 : delta > 0 ? 1 : this.lastDirection;
+        const sourceOffset = direction === -1 ? this.levelBuffer.duration - timelineOffset - 0.01 : timelineOffset;
         this.lastSeekTick = snapped;
 
         if (this.levelSource) {
             const expectedElapsed = this.ctx.currentTime - this.sourceStartedAt;
-            const drift = Math.abs(expectedElapsed - clampedOffset);
+            const drift = Math.abs(expectedElapsed - sourceOffset);
             const sinceLastReseek = this.ctx.currentTime - this.lastReseekAt;
-            // Always reseek on a direction flip (forward<->reverse) since the
-            // running source can only ever play forward in real time and will
-            // otherwise diverge from the timeline immediately. Otherwise only
-            // reseek when drift has grown large, and throttle to avoid
-            // creating buffer sources every frame (the cause of crackling).
-            const needsReseek = reversed || drift > 0.2;
-            if (!needsReseek || sinceLastReseek < 0.05) {
-                this.lastOffset = clampedOffset;
+            const needsReseek = direction !== this.lastDirection || drift > 0.2;
+            // A direction change must never be throttled: it also swaps to the
+            // reverse buffer. Ordinary drift corrections can wait briefly.
+            if (!needsReseek || (direction === this.lastDirection && sinceLastReseek < 0.05)) {
+                this.lastTimelineOffset = timelineOffset;
+                this.lastDirection = direction;
                 return;
             }
             try { this.levelSource.stop(); } catch { /* already stopped */ }
@@ -570,13 +585,14 @@ class Music {
         }
 
         this.levelSource = this.ctx.createBufferSource();
-        this.levelSource.buffer = this.levelBuffer;
+        this.levelSource.buffer = direction === -1 ? this.reverseLevelBuffer : this.levelBuffer;
         this.levelSource.loop = false;
         this.levelSource.connect(this.master);
-        this.levelSource.start(0, clampedOffset);
-        this.sourceStartedAt = this.ctx.currentTime - clampedOffset;
+        this.levelSource.start(0, sourceOffset);
+        this.sourceStartedAt = this.ctx.currentTime - sourceOffset;
         this.lastReseekAt = this.ctx.currentTime;
-        this.lastOffset = clampedOffset;
+        this.lastTimelineOffset = timelineOffset;
+        this.lastDirection = direction;
     }
 
     /**
@@ -589,7 +605,7 @@ class Music {
     pauseLevel(): void {
         if (!this._levelPlaying || this._levelPaused) return;
         this._levelPaused = true;
-        this.pausedOffset = (Math.max(0, this.lastSeekTick) / 3600) * 60;
+        this.pausedOffset = this.lastTimelineOffset;
         if (this.levelSource) {
             try { this.levelSource.stop(); } catch { /* already stopped */ }
             this.levelSource?.disconnect();
@@ -601,16 +617,16 @@ class Music {
     resumeLevel(): void {
         if (!this._levelPlaying || !this._levelPaused) return;
         this._levelPaused = false;
-        if (!this.ctx || !this.master || !this.levelBuffer) return;
-        const offset = Math.max(0, Math.min(this.pausedOffset, 59.99));
+        if (!this.ctx || !this.master || !this.levelBuffer || !this.reverseLevelBuffer) return;
+        const timelineOffset = Math.max(0, Math.min(this.pausedOffset, this.levelBuffer.duration - 0.01));
+        const offset = this.lastDirection === -1 ? this.levelBuffer.duration - timelineOffset - 0.01 : timelineOffset;
         this.levelSource = this.ctx.createBufferSource();
-        this.levelSource.buffer = this.levelBuffer;
+        this.levelSource.buffer = this.lastDirection === -1 ? this.reverseLevelBuffer : this.levelBuffer;
         this.levelSource.loop = false;
         this.levelSource.connect(this.master);
         this.levelSource.start(0, offset);
         this.sourceStartedAt = this.ctx.currentTime - offset;
         this.lastReseekAt = this.ctx.currentTime;
-        this.lastOffset = offset;
     }
 
     stopLevel(): void {
