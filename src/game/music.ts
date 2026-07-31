@@ -11,12 +11,11 @@
  * sequences, waveform types, tempos, and filter settings there. The rest is
  * plumbing.
  */
-
 const MUTE_KEY = 'chronostrophe:muted';
 
-// ──────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────
 // Pitch reference (equal temperament, A4 = 440 Hz)
-// ──────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────
 const Hz = {
     C2: 65.41, Cs2: 69.30, D2: 73.42, Eb2: 77.78, E2: 82.41, F2: 87.31,
     Fs2: 92.50, G2: 98.00, Ab2: 103.83, A2: 110.00, Bb2: 116.54, B2: 123.47,
@@ -46,6 +45,10 @@ class Music {
     private muted = localStorage.getItem(MUTE_KEY) === '1';
     /** Throttle seekLevel to avoid creating 60 buffer sources per second. */
     private lastSeekTick = -1;
+    /** True while the level track is frozen (e.g. time paused on a device). */
+    private _levelPaused = false;
+    /** The buffer offset (seconds) the level track was frozen at. */
+    private pausedOffset = 0;
 
     get isMuted(): boolean {
         return this.muted;
@@ -84,9 +87,9 @@ class Music {
         return this._initPromise;
     }
 
-    // ────────────────────────────────────────────────────────────────
-    //  MENU TRACK  —  "Chronosphere"
-    // ────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────
+    // MENU TRACK — "Chronosphere"
+    // ─────────────────────────────────────────────────
     private async renderMenu(): Promise<AudioBuffer> {
         const sr = 44100;
         const BPM = 240;
@@ -118,7 +121,6 @@ class Music {
         const NOISE_FILTER_FREQ = 2200;
 
         const beatLen = 60 / BPM;
-
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.55, 0);
         master.connect(ctx.destination);
@@ -214,19 +216,19 @@ class Music {
         return buffer;
     }
 
-    // ────────────────────────────────────────────────────────────────
-    //  LEVEL TRACK  —  "Timeline"
-    //  Exactly 60 s (the seek math in seekLevel() assumes this).
+    // ─────────────────────────────────────────────────
+    // LEVEL TRACK — "Timeline"
+    // Exactly 60 s (the seek math in seekLevel() assumes this).
     //
-    //  This is deliberately NOT a separate composition. It reuses the
-    //  menu track's exact chord (PAD_NOTES), bass line (BASS_PATTERN),
-    //  and both arp phrases verbatim — same key, same tempo, same
-    //  voices — so it reads as "the same song" rather than a different
-    //  piece of music.
+    // This is deliberately NOT a separate composition. It reuses the
+    // menu track's exact chord (PAD_NOTES), bass line (BASS_PATTERN),
+    // and both arp phrases verbatim — same key, same tempo, same
+    // voices — so it reads as "the same song" rather than a different
+    // piece of music.
     //
-    //  What changes is arrangement, split into six 10 s segments so a
-    //  long, looping gameplay track has real variety instead of the
-    //  menu's short 4 s loop repeating fifteen times in a row:
+    // What changes is arrangement, split into six 10 s segments so a
+    // long, looping gameplay track has real variety instead of the
+    // menu's short 4 s loop repeating fifteen times in a row:
     //
     //   0-10 s   Groove only — pad + bass, no arp (mirrors the menu's
     //            own opening bars before the arp comes in)
@@ -241,19 +243,18 @@ class Music {
     //  50-60 s   Phrase B alone, slowed down, percussion stripped back
     //            — winds back to the intro feel so the loop point
     //            doesn't jar
-    // ────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────
     private async renderLevel(): Promise<AudioBuffer> {
         const sr = 44100;
         const dur = 60;
         const len = sr * dur;
         const ctx = new OfflineAudioContext(2, len, sr);
 
-        // ── EDITABLE PARAMETERS ───────────────────────────────────────
+        // ── EDITABLE PARAMETERS ─────────────────────────────────────
         const BPM = 240; // same tempo as the menu track
         const SECTION_LEN = 10;
         const stepLen = 60 / BPM; // same step length the menu arp uses
         const beatLen = stepLen; // "beat" here = one menu-arp step
-
         const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4]; // identical chord to the menu pad
         const PAD_WAVE: OscillatorType = 'sawtooth';
         const PAD_DETUNE_CT = 6;
@@ -266,9 +267,9 @@ class Music {
 
         const ARP_PHRASE_A = [Hz.C4, Hz.Eb4, Hz.G4, Hz.Bb4, Hz.C5, Hz.Bb4, Hz.G4, Hz.Eb4];
         const ARP_PHRASE_B = [Hz.G4, Hz.Bb4, Hz.Eb5, Hz.D5, Hz.C5, Hz.G4, Hz.Eb4, Hz.C4];
-        const ARP_PHRASE_A_LOW = ARP_PHRASE_A.map((f) => f / 2);   // octave down — mellow variant
-        const ARP_PHRASE_B_HIGH = ARP_PHRASE_B.map((f) => f * 2);  // octave up — bright variant
-        const ARP_THEME = [...ARP_PHRASE_A, ...ARP_PHRASE_B];      // the menu's full theme, verbatim
+        const ARP_PHRASE_A_LOW = ARP_PHRASE_A.map((f) => f / 2); // octave down — mellow variant
+        const ARP_PHRASE_B_HIGH = ARP_PHRASE_B.map((f) => f * 2); // octave up — bright variant
+        const ARP_THEME = [...ARP_PHRASE_A, ...ARP_PHRASE_B]; // the menu's full theme, verbatim
         // Call-and-response: phrase A answered an octave down, note by note.
         const ARP_CLIMAX = ARP_PHRASE_A.flatMap((f, i) => [f, ARP_PHRASE_A_LOW[i]]);
         const ARP_VOLUME = 0.6;
@@ -291,7 +292,7 @@ class Music {
             { arp: ARP_CLIMAX, arpStepLen: stepLen / 2, bassEvery: 1, kick: true, snare: true, hat: true, volume: 1.15 },
             { arp: ARP_PHRASE_B, arpStepLen: stepLen * 1.5, bassEvery: 1, kick: true, snare: false, hat: false, volume: 0.75 },
         ];
-        // ── END EDITABLE PARAMETERS ───────────────────────────────────
+        // ── END EDITABLE PARAMETERS ────────────────────────────────────
 
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.5, 0);
@@ -425,7 +426,6 @@ class Music {
             const seg = SEGMENTS[sec];
             const t0 = sec * SECTION_LEN;
             const beatsPerSection = Math.floor(SECTION_LEN / beatLen);
-
             if (seg.kick) {
                 for (let b = 0; b < beatsPerSection; b++) {
                     if (b % 4 !== 0 && b % 4 !== 2) continue;
@@ -462,10 +462,9 @@ class Music {
         return buffer;
     }
 
-    // ────────────────────────────────────────────────────────────────
-    //  Playback
-    // ────────────────────────────────────────────────────────────────
-
+    // ─────────────────────────────────────────────────
+    // Playback
+    // ─────────────────────────────────────────────────
     async playMenu(): Promise<void> {
         if (this._menuPlaying) return;
         await this.init();
@@ -478,11 +477,9 @@ class Music {
         this.menuSource.buffer = this.menuBuffer;
         this.menuSource.loop = true;
         this.menuSource.connect(this.master);
-
         const targetGain = this.muted ? 0 : 0.35;
         this.master.gain.setValueAtTime(0, ctx.currentTime);
         this.master.gain.linearRampToValueAtTime(targetGain, ctx.currentTime + 2.0);
-
         this.menuSource.start(0);
     }
 
@@ -507,7 +504,9 @@ class Music {
         if (!ctx || !this.master || !this.levelBuffer) return;
         this.stopLevel();
         this._levelPlaying = true;
+        this._levelPaused = false;
         this.lastSeekTick = 0;
+        this.pausedOffset = 0;
         this.levelSource = ctx.createBufferSource();
         this.levelSource.buffer = this.levelBuffer;
         this.levelSource.loop = false;
@@ -515,8 +514,14 @@ class Music {
         this.levelSource.start(0, 0);
     }
 
+    /**
+     * Sync level playback to the current timeline tick. While paused
+     * (see pauseLevel()), this is a no-op — the buffer source stays
+     * frozen at the tick pauseLevel() captured it at, so the music
+     * genuinely stops advancing rather than silently drifting on.
+     */
     seekLevel(tick: number): void {
-        if (!this._levelPlaying || !this.ctx || !this.master || !this.levelBuffer)
+        if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer)
             return;
         const snapped = Math.round(tick);
         if (snapped === this.lastSeekTick && this.levelSource) return;
@@ -533,8 +538,39 @@ class Music {
         this.levelSource.start(0, Math.max(0, Math.min(offset, 59.99)));
     }
 
+    /**
+     * Freeze the level track at its current position. Actually stops
+     * the underlying buffer source (rather than just leaving seekLevel
+     * un-called), since a started AudioBufferSourceNode keeps playing
+     * in real wall-clock time regardless of whether the game timeline
+     * is advancing.
+     */
+    pauseLevel(): void {
+        if (!this._levelPlaying || this._levelPaused) return;
+        this._levelPaused = true;
+        this.pausedOffset = (Math.max(0, this.lastSeekTick) / 3600) * 60;
+        if (this.levelSource) {
+            try { this.levelSource.stop(); } catch { /* already stopped */ }
+            this.levelSource?.disconnect();
+            this.levelSource = null;
+        }
+    }
+
+    /** Resume the level track from wherever pauseLevel() froze it. */
+    resumeLevel(): void {
+        if (!this._levelPlaying || !this._levelPaused) return;
+        this._levelPaused = false;
+        if (!this.ctx || !this.master || !this.levelBuffer) return;
+        this.levelSource = this.ctx.createBufferSource();
+        this.levelSource.buffer = this.levelBuffer;
+        this.levelSource.loop = false;
+        this.levelSource.connect(this.master);
+        this.levelSource.start(0, Math.max(0, Math.min(this.pausedOffset, 59.99)));
+    }
+
     stopLevel(): void {
         this._levelPlaying = false;
+        this._levelPaused = false;
         if (this.levelSource) {
             try { this.levelSource.stop(); } catch { /* already stopped */ }
             this.levelSource?.disconnect();
