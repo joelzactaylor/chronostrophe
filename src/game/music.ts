@@ -94,16 +94,16 @@ class Music {
     // ────────────────────────────────────────────────────────────────
     private async renderMenu(): Promise<AudioBuffer> {
         const sr = 44100;
-        const dur = 16; // seconds
+        const BPM = 240;
+        const dur = 16 * 60 / BPM
         const len = sr * dur;
         const ctx = new OfflineAudioContext(2, len, sr);
 
         // ── EDITABLE PARAMETERS ───────────────────────────────────────
-        const BPM = 110;
         const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4]; // Cm7
         const PAD_WAVE: OscillatorType = 'sawtooth';
         const PAD_DETUNE_CT = 6; // cents
-        const PAD_VOLUME = 1;
+        const PAD_VOLUME = 0.4;
         const PAD_FILTER_CUTOFF = 900;
         const PAD_FILTER_LFO_DEPTH = 350;
         const PAD_FILTER_LFO_RATE = 0.12;
@@ -117,8 +117,7 @@ class Music {
         const ARP_PHRASE_B = [Hz.G4, Hz.Bb4, Hz.Eb5, Hz.D5, Hz.C5, Hz.G4, Hz.Eb4, Hz.C4];
         const ARP_NOTES = [...ARP_PHRASE_A, ...ARP_PHRASE_B];
         const ARP_WAVE: OscillatorType = 'triangle';
-        const ARP_RATE = BPM / 60 * 4; // 16th notes
-        const ARP_VOLUME = 6;
+        const ARP_VOLUME = 1;
         // Per-note velocity to add organic variation (indexed by position in 16-note pattern)
         const ARP_VELOCITIES = [0.14, 0.09, 0.12, 0.08, 0.14, 0.10, 0.11, 0.08,
             0.11, 0.08, 0.14, 0.10, 0.12, 0.09, 0.08, 0.13];
@@ -196,11 +195,11 @@ class Music {
         arpOsc.start(0);
         arpOsc.stop(dur);
 
-        const stepLen = 1 / ARP_RATE;
+        const stepLen = 60 / BPM
         const arpPatLen = ARP_NOTES.length; // 16
         // Round totalSteps down to a multiple of the pattern length so the
         // arpeggio always completes a full phrase at the loop boundary.
-        const totalSteps = Math.ceil(dur * ARP_RATE);
+        const totalSteps = 16;
         for (let i = 0; i < totalSteps; i++) {
             const t = i * stepLen;
             const noteIdx = i % arpPatLen;
