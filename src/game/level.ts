@@ -13,8 +13,6 @@ export interface Device {
 
 export interface LevelDef {
   name: string;
-  /** One-line brief shown while the level starts. */
-  brief: string;
   map: TileMap;
   spawn: { x: number; y: number };
   boxes: BoxSpec[];
@@ -100,9 +98,6 @@ export function spring(cx: number, surfaceRow: number, tiles = 1): Rect {
   return { x: cx * TILE, y: surfaceRow * TILE - SPRING_H, w: tiles * TILE, h: SPRING_H };
 }
 
-/** Tick at which the monolith of level 1 is let go. */
-export const MONOLITH_RELEASE = 150;
-
 /**
  * "Threshold" — a flat sprint for the gate. Two and a half seconds in, a monolith
  * drops across the run and walls it off. The only way through is the chronoporter
@@ -121,14 +116,13 @@ function buildThreshold(): LevelDef {
 
   return {
     name: 'Threshold',
-    brief: 'Run for the gate.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     // Suspended overhead, released mid-sprint: 4x3 tiles of stone, too tall to clear.
     boxes: [
-      { x: 30 * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick: MONOLITH_RELEASE },
+      { x: 24 * TILE, y: 2 * TILE, w: 4 * TILE, h: 3 * TILE, immovable: true, releaseTick: 150 },
     ],
-    devices: [pad('chronoporter', 26, 15, 'CHRONOPORTER')],
+    devices: [pad('chronoporter', 20, 15, 'CHRONOPORTER')],
     hazards: [],
     hazardsInverted: [],
     exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
@@ -161,7 +155,6 @@ function buildInterval(): LevelDef {
   const map = new TileMap(corridorGrid().map((r) => r.join('')));
   return {
     name: 'Interval',
-    brief: 'Two stones, two different moments.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [monolith(12, 150), monolith(24, 180)],
@@ -190,7 +183,6 @@ function buildBallast(): LevelDef {
 
   return {
     name: 'Ballast',
-    brief: 'The crate is the step. Get it through.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     // Clear of the pad on the far side: the pad has to be reachable without
@@ -220,7 +212,6 @@ function buildCascade(): LevelDef {
   const map = new TileMap(grid.map((r) => r.join('')));
   return {
     name: 'Cascade',
-    brief: 'Three stones, then a climb.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [
@@ -267,7 +258,6 @@ function buildLift(): LevelDef {
 
   return {
     name: 'Lift',
-    brief: 'The stone falls. Reverse time and ride it back up.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [
@@ -295,7 +285,6 @@ function buildDeadweight(): LevelDef {
 
   return {
     name: 'Deadweight',
-    brief: 'Something has to stay on the button.',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     // The weight: it starts to the right of the button, so it is shoved back into it.
@@ -320,7 +309,6 @@ function buildLiveweight(): LevelDef {
 
   return {
     name: 'Liveweight',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [],
@@ -345,7 +333,6 @@ function buildOneTwo(): LevelDef {
 
   return {
     name: 'One–Two',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [],
@@ -430,7 +417,6 @@ function buildEscapement(): LevelDef {
 
   return {
     name: 'Escapement',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 15 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, monolith(8, 420)],
@@ -481,7 +467,6 @@ function buildSkyscraper(): LevelDef {
 
   return {
     name: 'Skyscraper',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 16 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 11 * TILE - 28, w: 28, h: 28 }, { x: 16 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }],
@@ -537,7 +522,6 @@ function buildStages(): LevelDef {
 
   return {
     name: 'Stages',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 8 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, { x: 29 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, monolith(10, 0)],
@@ -573,7 +557,6 @@ function buildSpring(): LevelDef {
 
   return {
     name: 'Spring',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [],
@@ -583,7 +566,7 @@ function buildSpring(): LevelDef {
     hazards: [{ x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
     hazardsInverted: [],
     springs: [spring(6, 15), spring(15, 15), spring(21, 15), spring(24, 12), spring(28, 9), spring(32, 6)],
-    exit: { x: 38.5 * TILE, y: 8 * TILE - 26, r: 22 },
+    exit: { x: 37.5 * TILE, y: 8 * TILE - 26, r: 22 },
   };
 }
 
@@ -617,7 +600,6 @@ function buildSwitchback(): LevelDef {
 
   return {
     name: 'Switchback',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 10 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, monolith(18, 150)],
@@ -658,7 +640,6 @@ function buildPatience(): LevelDef {
 
   return {
     name: 'Patience',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [monolith(10, 300), monolith(18, 480), monolith(26, 480)],
@@ -685,7 +666,6 @@ function buildWedge(): LevelDef {
 
   return {
     name: 'Wedge',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 33 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(16, 660)],
@@ -721,14 +701,13 @@ function buildDrop(): LevelDef {
 
   return {
     name: 'Drop',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 24 * TILE, y: 10 * TILE - 28, w: 28, h: 28 }, { x: 31 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }],
     devices: [pad('chronoporter', 11, 11, 'CHRONOPORTER')],
     buttons: [button(5, 15, 0), button(15, 16, 1)],
-    phase: [...phaseBlocks(0, 14, 11, 21, 11), ...phaseBlocks(0, 13, 7, 13, 10, true), ...phaseBlocks(1, 22, 7, 22, 10, true), ...phaseBlocks(1, 17, 13, 26, 13, true)],
-    hazards: [{ x: 14 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    phase: [...phaseBlocks(0, 14, 11, 21, 11), ...phaseBlocks(0, 13, 7, 13, 10, true), ...phaseBlocks(1, 22, 7, 22, 10, true), ...phaseBlocks(1, 20, 13, 26, 13, true)],
+    hazards: [{ x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
     hazardsInverted: [],
     springs: [spring(30, 15)],
     exit: { x: 41.5 * TILE, y: 11 * TILE - 26, r: 22 },
@@ -747,7 +726,6 @@ function buildBoost(): LevelDef {
 
   return {
     name: 'Boost',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 10 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 8 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 3 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 1 * TILE - 28, w: 28, h: 28 }],
@@ -779,7 +757,6 @@ function buildInterception(): LevelDef {
 
   return {
     name: 'Interception',
-    brief: '',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
     boxes: [{ x: 22 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 14 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 9 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, { x: 11 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, monolith(8, 420)],
@@ -790,6 +767,104 @@ function buildInterception(): LevelDef {
     hazardsInverted: [],
     springs: [spring(14, 15)],
     exit: { x: 40.5 * TILE, y: 10 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildOverhead(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 35, 11, 42, 11);
+  fill(grid, 35, 12, 42, 12);
+  fill(grid, 35, 13, 36, 13);
+  fill(grid, 9, 14, 17, 14);
+  fill(grid, 26, 14, 36, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Overhead',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 14 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 11, 14, 'CHRONOPORTER')],
+    buttons: [],
+    phase: [],
+    hazards: [{ x: 37 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [],
+    springs: [],
+    exit: { x: 41.5 * TILE, y: 10 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildPrecognition(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 0, 0, 16); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 13); // right wall
+  fill(grid, 13, 7, 17, 7);
+  fill(grid, 19, 7, 21, 7);
+  fill(grid, 33, 7, 35, 7);
+  fill(grid, 38, 7, 42, 7);
+  fill(grid, 13, 8, 13, 8);
+  fill(grid, 33, 8, 33, 8);
+  fill(grid, 11, 9, 11, 9);
+  fill(grid, 13, 9, 13, 9);
+  fill(grid, 31, 9, 31, 9);
+  fill(grid, 33, 9, 33, 9);
+  fill(grid, 11, 10, 11, 10);
+  fill(grid, 13, 10, 13, 10);
+  fill(grid, 31, 10, 31, 10);
+  fill(grid, 33, 10, 33, 10);
+  fill(grid, 9, 11, 9, 11);
+  fill(grid, 11, 11, 11, 11);
+  fill(grid, 13, 11, 13, 11);
+  fill(grid, 29, 11, 29, 11);
+  fill(grid, 31, 11, 31, 11);
+  fill(grid, 33, 11, 33, 11);
+  fill(grid, 9, 12, 9, 12);
+  fill(grid, 11, 12, 11, 12);
+  fill(grid, 13, 12, 13, 12);
+  fill(grid, 29, 12, 29, 12);
+  fill(grid, 31, 12, 31, 12);
+  fill(grid, 33, 12, 33, 12);
+  fill(grid, 40, 12, 42, 12);
+  fill(grid, 7, 13, 7, 13);
+  fill(grid, 9, 13, 9, 13);
+  fill(grid, 11, 13, 11, 13);
+  fill(grid, 13, 13, 13, 13);
+  fill(grid, 18, 13, 18, 13);
+  fill(grid, 27, 13, 27, 13);
+  fill(grid, 29, 13, 29, 13);
+  fill(grid, 31, 13, 31, 13);
+  fill(grid, 33, 13, 33, 13);
+  fill(grid, 40, 13, 42, 13);
+  fill(grid, 7, 14, 7, 14);
+  fill(grid, 9, 14, 9, 14);
+  fill(grid, 11, 14, 11, 14);
+  fill(grid, 13, 14, 13, 14);
+  fill(grid, 27, 14, 27, 14);
+  fill(grid, 29, 14, 29, 14);
+  fill(grid, 31, 14, 31, 14);
+  fill(grid, 33, 14, 33, 14);
+  fill(grid, 40, 14, 40, 14);
+  fill(grid, 1, 15, 40, 15);
+  fill(grid, 1, 16, 40, 16);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Precognition',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 15 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 15, 15, 'CHRONOPORTER')],
+    buttons: [button(24, 15, 0)],
+    phase: [...phaseBlocks(0, 18, 7, 18, 7)],
+    hazards: [{ x: 8 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [],
+    springs: [spring(5, 15), spring(7, 13), spring(9, 11), spring(11, 9)],
+    exit: { x: 41.5 * TILE, y: 11 * TILE - 26, r: 22 },
   };
 }
 
@@ -804,14 +879,16 @@ export const LEVELS: (() => LevelDef)[] = [
   buildSpring,
   buildBoost,
   buildOneTwo,
-  buildSkyscraper,
+  buildOverhead,
   buildEscapement,
-  buildDrop,
   buildStages,
   buildSwitchback,
   buildPatience,
+  buildDrop,
   buildWedge,
   buildInterception,
+  buildPrecognition,
+  buildSkyscraper,
 ];
 
 export function buildLevel(index = 0): LevelDef {

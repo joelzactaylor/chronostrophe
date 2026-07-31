@@ -4,15 +4,20 @@ import { HudScene } from './game/HudScene';
 import { MenuScene } from './game/MenuScene';
 import { EditorScene } from './game/EditorScene';
 import { TitleScene } from './game/TitleScene';
+import { initTheme, getCurrentTheme } from './game/theme';
 
 const HUD_H = 96;
+
+initTheme();
+const theme = getCurrentTheme();
+const bgHex = `#${theme.bg.toString(16).padStart(6, '0')}`;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'app',
   width: VIEW_W,
   height: VIEW_H + HUD_H,
-  backgroundColor: '#05030a',
+  backgroundColor: bgHex,
   pixelArt: true,
   roundPixels: true,
   scale: {

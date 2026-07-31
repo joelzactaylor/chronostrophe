@@ -1,13 +1,12 @@
 import Phaser from 'phaser';
+import { FADE_COLOUR } from './theme';
 
 /** Long enough to read as a fade, short enough not to sit between two levels. */
 export const FADE_MS = 260;
 
-const BG: [number, number, number] = [5, 3, 10];
-
 /** Fades a scene up from the backdrop colour as it opens. */
 export function fadeIn(scene: Phaser.Scene, ms = FADE_MS): void {
-  scene.cameras.main.fadeIn(ms, ...BG);
+  scene.cameras.main.fadeIn(ms, ...FADE_COLOUR());
 }
 
 /**
@@ -19,5 +18,5 @@ export function fadeOutThen(scene: Phaser.Scene, ms: number, then: () => void): 
   const cam = scene.cameras.main;
   if (cam.fadeEffect.isRunning) return;
   cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, then);
-  cam.fadeOut(ms, ...BG);
+  cam.fadeOut(ms, ...FADE_COLOUR());
 }

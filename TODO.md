@@ -1,18 +1,10 @@
-# Menu Screen Enhancement
+# Menu Music Fix - TODO
 
-## Steps
-
-- [x] Plan approved
-- [x] 1. Add "dev1.2" version tag to title area
-- [x] 2. Add floating particle background
-- [x] 3. Add title glow/pulse animation
-- [x] 4. Add decorative circuitry/lines
-- [x] 5. Add ambient floating orbs
-- [x] 6. Add level list cursor shimmer effect
-- [x] 7. Add cursor trailing glow
-- [x] Type check passes
-
-## Implementation
-
-Edited file: `src/game/MenuScene.ts`
-
+- [x] Analyze the root cause (race condition: `playMenu()` called before `init()` finishes rendering)
+- [x] Get user approval on plan
+- [x] Edit `src/game/music.ts`:
+  - [x] Add `_initPromise` field to track pending initialization
+  - [x] Modify `init()` to store and return the promise (prevent duplicate concurrent renders)
+  - [x] Modify `playMenu()` to await `init()` if buffer not ready
+  - [x] Modify `playLevel()` to await `init()` if buffer not ready
+- [x] Verify compilation with `npx tsc --noEmit`

@@ -8,6 +8,8 @@
  * calls before that are dropped.
  */
 
+import { music } from './music';
+
 const MUTE_KEY = 'chronostrophe:muted';
 
 type Wave = OscillatorType;
@@ -28,6 +30,8 @@ class Sfx {
     this.muted = !this.muted;
     localStorage.setItem(MUTE_KEY, this.muted ? '1' : '0');
     if (this.master) this.master.gain.value = this.muted ? 0 : 0.5;
+    // Keep music in sync — mute both SFX and music together.
+    void music.toggleMute();
     return this.muted;
   }
 
@@ -35,6 +39,9 @@ class Sfx {
   unlock(): void {
     const ctx = this.context();
     if (ctx && ctx.state === 'suspended') void ctx.resume();
+    // Also initialise music buffers on first user gesture.
+    void music.init();
+    music.unlock();
   }
 
   private context(): AudioContext | null {
@@ -195,3 +202,4 @@ class Sfx {
 }
 
 export const sfx = new Sfx();
+export { music } from './music';

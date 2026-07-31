@@ -89,7 +89,6 @@ export function draftToLevel(d: Draft): LevelDef {
   }));
   return {
     name: d.name,
-    brief: '',
     map,
     spawn: { x: d.spawn.cx * TILE, y: d.spawn.row * TILE - 28 },
     boxes,
@@ -227,7 +226,6 @@ export function draftToCode(d: Draft): string {
     '',
     '  return {',
     `    name: '${d.name.replace(/'/g, "\\'")}',`,
-    `    brief: '',`,
     '    map,',
     `    spawn: { x: ${d.spawn.cx} * TILE, y: ${d.spawn.row} * TILE - 28 },`,
     `    boxes: ${list(boxes)},`,

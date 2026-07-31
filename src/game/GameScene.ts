@@ -4,9 +4,26 @@ import { Box, Input, PLAYER_H, PLAYER_W, World, boxRect, playerRect } from '../c
 import { Device, LEVELS, LevelDef, buildLevel } from './level';
 import { FISHEYE_KEY, FisheyePipeline } from './fisheye';
 import { fadeIn, fadeOutThen } from './transition';
-import { sfx } from './audio';
+import { sfx, music } from './audio';
 import { groupColour, mixColor, shade, tint } from './palette';
 import { markLevelComplete } from './progress';
+import {
+  COL_BG,
+  COL_TILE,
+  COL_TILE_INNER,
+  COL_TILE_EDGE,
+  COL_PLAYER,
+  COL_MODAL_BG,
+  COL_VIGNETTE,
+  NEBULA_COLORS,
+  COL_BACKDROP_FRAME,
+  COL_BOX_FIXED,
+  COL_BOX_STRIPE_FIXED,
+  COL_MONOLITH_FIXED,
+  COL_MONOLITH_INNER_FIXED,
+  COL_MONOLITH_EDGE_FIXED,
+  applyThemeForLevel,
+} from './theme';
 
 export type GameState = 'play' | 'death' | 'dust' | 'fisheye' | 'won';
 
@@ -48,12 +65,7 @@ interface Capture {
 /** Ticks of immunity after a restart or a timeline edit before history is judged again. */
 const PARADOX_GRACE = 5;
 
-const COL_BG = 0x0b0714;
-const COL_TILE = 0x241a44;
-const COL_TILE_EDGE = 0x6d4bd6;
-const COL_PLAYER = 0xf7e26b;
 const COL_GHOST = 0x76d9ff;
-const COL_BOX = 0xd98b45;
 const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
 const COL_SPRING = 0x9be36a;
@@ -105,6 +117,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.level = this.draft ?? buildLevel(this.levelIndex);
+    if (this.draft === null) applyThemeForLevel(this.levelIndex);
     this.world = new World(
       this.level.map,
       this.level.spawn,
@@ -133,11 +146,13 @@ export class GameScene extends Phaser.Scene {
     g.destroy();
 
     this.cameras.main.setViewport(0, 0, VIEW_W, VIEW_H);
-    this.cameras.main.setBackgroundColor(COL_BG);
+    this.cameras.main.setBackgroundColor(COL_BG());
     this.cameras.main.setBounds(0, 0, this.level.map.widthPx, this.level.map.heightPx);
     this.cameras.main.setAlpha(1);
     this.cameras.main.setZoom(1);
     fadeIn(this);
+    void music.init();
+    void music.playLevel();
     this.followTarget.x = this.level.spawn.x;
     this.followTarget.y = this.level.spawn.y;
     this.cameras.main.startFollow(this.followTarget, true, 0.12, 0.12);
@@ -163,12 +178,11 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-ESC', () => this.openMenu());
     kb.on('keydown-ENTER', () => {
       if (this.state !== 'won' || !this.captureDone) return;
-      if (this.draft) {
+      if (this.draft || !this.hasNextLevel) {
         this.openMenu();
         return;
       }
-      const next = this.hasNextLevel ? this.levelIndex + 1 : 0;
-      fadeOutThen(this, 220, () => this.scene.restart({ level: next }));
+      fadeOutThen(this, 220, () => this.scene.restart({ level: this.levelIndex + 1 }));
     });
 
     if (!this.scene.isActive('hud')) this.scene.launch('hud');
@@ -213,6 +227,7 @@ export class GameScene extends Phaser.Scene {
   /** Back to wherever this run came from: the editor for a draft, the list otherwise. */
   openMenu(): void {
     const draft = this.draft;
+    music.stopLevel();
     fadeOutThen(this, 200, () => {
       this.scene.stop('hud');
       if (draft) this.scene.start('editor');
@@ -220,11 +235,10 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /**
-   * The way out of a run that cannot be finished: a level can be walled off with
-   * every pad on the far side of the stone, and history is only worth keeping if
-   * abandoning it is cheap.
-   */
+  /** The way out of a run that cannot be finished: a level can be walled off with
+     * every pad on the far side of the stone, and history is only worth keeping if
+     * abandoning it is cheap.
+     */
   abandonRun(): void {
     if (this.state === 'play') this.fail('death', 'RUN ABANDONED');
     else fadeOutThen(this, 200, () => this.scene.restart({ level: this.levelIndex, draft: this.draft }));
@@ -235,6 +249,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.canScrub()) return;
     if (t !== this.world.now) sfx.scrubTick();
     this.world.scrubTo(t);
+    music.seekLevel(t);
   }
 
   canScrub(): boolean {
@@ -269,6 +284,8 @@ export class GameScene extends Phaser.Scene {
     this.followTarget.x = this.world.player.x + 10;
     this.followTarget.y = this.world.player.y + 14;
     this.beatForAnomalies();
+    // Sync level music position to the current timeline tick.
+    music.seekLevel(this.world.now);
     this.render();
   }
 
@@ -449,7 +466,7 @@ export class GameScene extends Phaser.Scene {
   deviceHint(): string | null {
     const d = this.activeDevice;
     if (!d) return null;
-    return d.kind === 'anachroverter' ? `${d.label} — [R] reverses time` : `${d.label} — drag the slider to advance time`;
+    return d.kind === 'anachroverter' ? `${d.label} — press [R] to reverse time` : `${d.label} — drag the slider to advance time`;
   }
 
   /** Lived steps between the nearest anomaly and the present, or null if there is none. */
@@ -496,6 +513,8 @@ export class GameScene extends Phaser.Scene {
       x === undefined || y === undefined
         ? new Phaser.Geom.Rectangle(cam.scrollX, cam.scrollY, VIEW_W, VIEW_H)
         : new Phaser.Geom.Rectangle(x - 12, y - 14, 24, 28);
+    const player = COL_PLAYER();
+    const tileEdge = COL_TILE_EDGE();
     this.dust = this.add.particles(0, 0, 'dust-px', {
       emitZone: { type: 'random', source: area, quantity: count },
       quantity: count,
@@ -505,7 +524,7 @@ export class GameScene extends Phaser.Scene {
       gravityY: 60,
       scale: { start: 1.2, end: 0 },
       alpha: { start: 0.9, end: 0 },
-      tint: [0xf7e26b, 0x76d9ff, 0x6d4bd6, 0xffffff],
+      tint: [player, COL_GHOST, tileEdge, 0xffffff],
       blendMode: 'ADD',
       emitting: false,
     });
@@ -589,9 +608,10 @@ export class GameScene extends Phaser.Scene {
   private drawVignette(): void {
     const g = this.vignette;
     g.clear();
+    const vignette = COL_VIGNETTE();
     for (let i = 0; i < 22; i++) {
       const k = i / 22;
-      g.lineStyle(6, 0x05030a, 0.035 + k * 0.05);
+      g.lineStyle(6, vignette, 0.035 + k * 0.05);
       g.strokeRect(3 * i, 3 * i, VIEW_W - 6 * i, VIEW_H - 6 * i);
     }
   }
@@ -599,24 +619,27 @@ export class GameScene extends Phaser.Scene {
   private drawBackdrop(): void {
     const g = this.bg;
     g.clear();
+    const nebulaColors = NEBULA_COLORS();
     // A little depth behind the stars: slow, dim clouds of nothing much.
     for (let i = 0; i < 5; i++) {
       const x = 200 + i * 430;
       const y = 90 + (i % 3) * 150;
       for (let r = 6; r >= 1; r--) {
-        g.fillStyle(i % 2 === 0 ? 0x2b1d55 : 0x1b2a55, 0.02);
+        g.fillStyle(nebulaColors[i % nebulaColors.length], 0.02);
         g.fillCircle(x, y, r * 26);
       }
     }
+    const tileEdge = COL_TILE_EDGE();
+    const backdropFrame = COL_BACKDROP_FRAME();
     for (let i = 0; i < 90; i++) {
       const x = (i * 137) % (this.level.map.widthPx + 400);
       const y = (i * 271) % this.level.map.heightPx;
       const s = 1 + (i % 3);
-      g.fillStyle(i % 5 === 0 ? 0x6d4bd6 : 0x2b2350, 0.9);
+      g.fillStyle(i % 5 === 0 ? tileEdge : backdropFrame, 0.9);
       g.fillRect(x, y, s, s);
     }
     for (let i = 0; i < 6; i++) {
-      g.lineStyle(2, 0x1a1236, 0.9);
+      g.lineStyle(2, backdropFrame, 0.9);
       g.strokeRect(120 + i * 260, 60 + (i % 3) * 90, 180, 120);
     }
   }
@@ -644,14 +667,17 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const x0 = Math.max(0, Math.floor(cam.scrollX / TILE) - 1);
     const x1 = Math.min(map.cols - 1, Math.ceil((cam.scrollX + VIEW_W) / TILE));
+    const tile = COL_TILE();
+    const tileInner = COL_TILE_INNER();
+    const tileEdge = COL_TILE_EDGE();
     for (let cy = 0; cy < map.rows; cy++) {
       for (let cx = x0; cx <= x1; cx++) {
         if (!map.isSolid(cx, cy)) continue;
         const x = cx * TILE;
         const y = cy * TILE;
-        g.fillStyle(COL_TILE, 1).fillRect(x, y, TILE, TILE);
-        g.fillStyle(0x1a1233, 1).fillRect(x + 2, y + 6, TILE - 4, TILE - 8);
-        if (!map.isSolid(cx, cy - 1)) g.fillStyle(COL_TILE_EDGE, 1).fillRect(x, y, TILE, 4);
+        g.fillStyle(tile, 1).fillRect(x, y, TILE, TILE);
+        g.fillStyle(tileInner, 1).fillRect(x + 2, y + 6, TILE - 4, TILE - 8);
+        if (!map.isSolid(cx, cy - 1)) g.fillStyle(tileEdge, 1).fillRect(x, y, TILE, 4);
       }
     }
   }
@@ -758,6 +784,7 @@ export class GameScene extends Phaser.Scene {
   private drawExit(g: Phaser.GameObjects.Graphics): void {
     const e = this.level.exit;
     const t = this.time.now / 1000;
+    const modalBg = COL_MODAL_BG();
     for (let i = 6; i >= 1; i--) {
       const r = e.r + i * 5;
       g.lineStyle(2, i % 2 === 0 ? 0x8b5cf6 : 0x38bdf8, 0.09 * i);
@@ -766,7 +793,7 @@ export class GameScene extends Phaser.Scene {
       g.strokePath();
     }
     g.fillStyle(0xd6b3ff, 0.35).fillCircle(e.x, e.y, e.r * 0.92);
-    g.fillStyle(0x05030a, 1).fillCircle(e.x, e.y, e.r * 0.72);
+    g.fillStyle(modalBg, 1).fillCircle(e.x, e.y, e.r * 0.72);
   }
 
   /**
@@ -813,10 +840,11 @@ export class GameScene extends Phaser.Scene {
     const r = boxRect(box);
     const held = this.world.now < box.releaseTick;
     if (held) this.drawDropCorridor(g, r);
-    g.fillStyle(0x151226, 1).fillRect(r.x, r.y, r.w, r.h);
-    g.fillStyle(held ? 0x3a3550 : 0x4a4466, 1).fillRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
-    g.lineStyle(2, 0x6d4bd6, held ? 0.5 : 0.85).strokeRect(r.x, r.y, r.w, r.h);
-    g.lineStyle(1, 0x241a44, 0.9);
+    const tileInner = COL_TILE_INNER();
+    g.fillStyle(COL_MONOLITH_FIXED, 1).fillRect(r.x, r.y, r.w, r.h);
+    g.fillStyle(held ? COL_MONOLITH_INNER_FIXED : COL_MONOLITH_INNER_FIXED, 1).fillRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
+    g.lineStyle(2, COL_MONOLITH_EDGE_FIXED, held ? 0.5 : 0.85).strokeRect(r.x, r.y, r.w, r.h);
+    g.lineStyle(1, tileInner, 0.9);
     g.lineBetween(r.x + r.w * 0.3, r.y + 4, r.x + r.w * 0.45, r.y + r.h - 4);
     g.lineBetween(r.x + r.w * 0.7, r.y + 4, r.x + r.w * 0.58, r.y + r.h - 4);
     g.lineBetween(r.x + 4, r.y + r.h * 0.55, r.x + r.w - 4, r.y + r.h * 0.42);
@@ -826,9 +854,9 @@ export class GameScene extends Phaser.Scene {
     if (box.immovable) return this.drawMonolith(g, box);
     const r = boxRect(box);
     const rewinding = this.world.dir === -1 && !this.world.paused;
-    g.fillStyle(0x7a4a1e, 1).fillRect(r.x, r.y, r.w, r.h);
-    g.fillStyle(COL_BOX, 1).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
-    g.fillStyle(0x7a4a1e, 1).fillRect(r.x + 6, r.y + r.h / 2 - 2, r.w - 12, 4);
+    g.fillStyle(COL_BOX_STRIPE_FIXED, 1).fillRect(r.x, r.y, r.w, r.h);
+    g.fillStyle(COL_BOX_FIXED, 1).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+    g.fillStyle(COL_BOX_STRIPE_FIXED, 1).fillRect(r.x + 6, r.y + r.h / 2 - 2, r.w - 12, 4);
     if (rewinding) {
       g.lineStyle(2, COL_GHOST, 0.9).strokeRect(r.x - 2, r.y - 2, r.w + 4, r.h + 4);
     } else if (this.world.paused) {
@@ -871,14 +899,15 @@ export class GameScene extends Phaser.Scene {
   private drawPlayer(g: Phaser.GameObjects.Graphics): void {
     const p = this.world.player;
     const r = playerRect(p);
+    const player = COL_PLAYER();
     // Where the body meets the floor, so a jump reads as height.
     const floorY = this.restRowUnder(r);
     const drop = clamp((floorY - (r.y + r.h)) / 140, 0, 1);
     if (floorY < this.level.map.heightPx) {
-      g.fillStyle(0x05030a, 0.4 * (1 - drop));
+      g.fillStyle(COL_MODAL_BG(), 0.4 * (1 - drop));
       g.fillEllipse(r.x + r.w / 2, floorY + 1, r.w * (1.1 - drop * 0.5), 6);
     }
-    this.drawBody(g, p, COL_PLAYER, 1);
+    this.drawBody(g, p, player, 1);
   }
 
   /** The body on its way in: the same body, drawn smaller and dimmer each frame. */
@@ -886,7 +915,8 @@ export class GameScene extends Phaser.Scene {
     const f = this.captureFrame();
     const w = PLAYER_W * f.scale;
     const h = PLAYER_H * f.scale;
-    g.fillStyle(mixColor(COL_PLAYER, COL_ANOMALY, f.k), 1 - f.k * 0.3);
+    const player = COL_PLAYER();
+    g.fillStyle(mixColor(player, COL_ANOMALY, f.k), 1 - f.k * 0.3);
     g.fillRect(f.x - w / 2, f.y - h / 2, w, h);
     // The gate answers: the ring tightens and the throat brightens as it takes it.
     const e = this.level.exit;

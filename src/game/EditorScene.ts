@@ -6,6 +6,20 @@ import { TILE } from '../core/types';
 import { fadeIn, fadeOutThen } from './transition';
 import { sfx } from './audio';
 import { GROUP_COLOURS, groupColour, shade } from './palette';
+import {
+  COL_BG,
+  COL_TILE,
+  COL_TILE_EDGE,
+  COL_EDITOR_GRID,
+  COL_EDITOR_UI_BG,
+  COL_EDITOR_UI_BORDER,
+  COL_BOX_FIXED,
+  COL_MONOLITH_FIXED,
+  COL_MONOLITH_EDGE_FIXED,
+  COL_TEXT_PRIMARY,
+  COL_TEXT_SECONDARY,
+  TEXT_HIGHLIGHT,
+} from './theme';
 
 type Tool =
   | 'wall'
@@ -73,20 +87,24 @@ export class EditorScene extends Phaser.Scene {
 
     const cam = this.cameras.main;
     cam.setViewport(0, 0, VIEW_W, VIEW_H);
-    cam.setBackgroundColor(0x0b0714);
+    cam.setBackgroundColor(COL_BG());
     cam.setZoom(ZOOM);
     cam.centerOn(MAP_W / 2, MAP_H / 2);
 
     this.gfx = this.add.graphics();
 
     const uiCam = this.cameras.add(0, VIEW_H, VIEW_W, UI_H);
-    uiCam.setBackgroundColor(0x08040f);
+    uiCam.setBackgroundColor(COL_EDITOR_UI_BG());
     this.ui = this.add.graphics();
-    const font = { fontFamily: 'monospace', fontSize: '11px', color: '#cfd8ff' };
+    const primary = COL_TEXT_PRIMARY();
+    const primaryCss = `#${primary.toString(16).padStart(6, '0')}`;
+    const font = { fontFamily: 'monospace', fontSize: '11px', color: primaryCss };
     this.toolTexts = TOOLS.map((t, i) =>
       this.add.text(12 + (i % 7) * 134, 10 + Math.floor(i / 7) * 18, `[${t.key}] ${t.label}`, font),
     );
-    this.status = this.add.text(12, 52, '', { ...font, color: '#8892bd', lineSpacing: 3 });
+    const secondary = COL_TEXT_SECONDARY();
+    const secondaryCss = `#${secondary.toString(16).padStart(6, '0')}`;
+    this.status = this.add.text(12, 52, '', { ...font, color: secondaryCss, lineSpacing: 3 });
 
     cam.ignore([this.ui, this.status, ...this.toolTexts]);
     uiCam.ignore(this.gfx);
@@ -298,15 +316,22 @@ export class EditorScene extends Phaser.Scene {
     const d = this.draft;
     g.clear();
 
+    const tile = COL_TILE();
+    const tileEdge = COL_TILE_EDGE();
+    const editorGrid = COL_EDITOR_GRID();
+    const box = COL_BOX_FIXED;
+    const monolith = COL_MONOLITH_FIXED;
+    const monolithEdge = COL_MONOLITH_EDGE_FIXED;
+
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const px = x * TILE;
         const py = y * TILE;
         if (d.rows[y][x] === '#') {
-          g.fillStyle(0x241a44, 1).fillRect(px, py, TILE, TILE);
-          g.fillStyle(0x6d4bd6, 0.5).fillRect(px, py, TILE, 2);
+          g.fillStyle(tile, 1).fillRect(px, py, TILE, TILE);
+          g.fillStyle(tileEdge, 0.5).fillRect(px, py, TILE, 2);
         } else {
-          g.lineStyle(1, 0x2a2350, 0.5).strokeRect(px + 0.5, py + 0.5, TILE - 1, TILE - 1);
+          g.lineStyle(1, editorGrid, 0.5).strokeRect(px + 0.5, py + 0.5, TILE - 1, TILE - 1);
         }
       }
     }
@@ -357,15 +382,15 @@ export class EditorScene extends Phaser.Scene {
     }
 
     for (const c of d.crates) {
-      g.fillStyle(0xd98b45, 1).fillRect(c.cx * TILE, c.row * TILE - 28, 28, 28);
+      g.fillStyle(box, 1).fillRect(c.cx * TILE, c.row * TILE - 28, 28, 28);
       g.lineStyle(1, 0x000000, 0.4).strokeRect(c.cx * TILE, c.row * TILE - 28, 28, 28);
     }
 
     for (const m of d.monoliths) {
-      g.fillStyle(0x3b2f66, 1).fillRect(m.cx * TILE, 2 * TILE, 4 * TILE, 3 * TILE);
-      g.lineStyle(2, 0x8f7de0, 0.9).strokeRect(m.cx * TILE, 2 * TILE, 4 * TILE, 3 * TILE);
+      g.fillStyle(monolith, 1).fillRect(m.cx * TILE, 2 * TILE, 4 * TILE, 3 * TILE);
+      g.lineStyle(2, monolithEdge, 0.9).strokeRect(m.cx * TILE, 2 * TILE, 4 * TILE, 3 * TILE);
       // The corridor it will occupy once it is let go, so the drop is visible while drawing.
-      g.fillStyle(0x8f7de0, 0.06).fillRect(m.cx * TILE, 5 * TILE, 4 * TILE, MAP_H - 5 * TILE);
+      g.fillStyle(monolithEdge, 0.06).fillRect(m.cx * TILE, 5 * TILE, 4 * TILE, MAP_H - 5 * TILE);
     }
 
     for (const p of d.pads) {
@@ -388,19 +413,23 @@ export class EditorScene extends Phaser.Scene {
   private drawUi(): void {
     const g = this.ui;
     g.clear();
-    g.lineStyle(1, 0x6d4bd6, 0.5).strokeRect(4, 4, VIEW_W - 8, UI_H - 8);
+    const editorUiBorder = COL_EDITOR_UI_BORDER();
+    const primary = COL_TEXT_PRIMARY();
+    const highlight = TEXT_HIGHLIGHT();
+    const primaryCss = `#${primary.toString(16).padStart(6, '0')}`;
+    g.lineStyle(1, editorUiBorder, 0.5).strokeRect(4, 4, VIEW_W - 8, UI_H - 8);
     TOOLS.forEach((t, i) => {
       const on = t.tool === this.tool;
       const x = 8 + (i % 7) * 134;
       const y = 6 + Math.floor(i / 7) * 18;
-      g.fillStyle(0x6d4bd6, on ? 0.3 : 0.06).fillRect(x, y, 130, 17);
+      g.fillStyle(editorUiBorder, on ? 0.3 : 0.06).fillRect(x, y, 130, 17);
       let label = t.label;
       if (this.shiftDown) {
         if (t.tool === 'hazard') label = 'INV SPIKES';
         else if (t.tool === 'phase') label = 'INV PHASE';
       }
       this.toolTexts[i].setText(`[${t.key}] ${label}`);
-      this.toolTexts[i].setColor(on ? '#ffffff' : '#cfd8ff');
+      this.toolTexts[i].setColor(on ? highlight : primaryCss);
     });
     const c = groupColour(this.group);
     g.fillStyle(c, 0.9).fillRect(VIEW_W - 26, 8, 14, 14);

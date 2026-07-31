@@ -2,6 +2,26 @@ import Phaser from 'phaser';
 import { TICKS, clamp } from '../core/types';
 import { GameScene, VIEW_H, VIEW_W } from './GameScene';
 import { sfx } from './audio';
+import {
+  COL_PANEL_BG,
+  COL_HUD_BORDER,
+  COL_BUTTON_DEFAULT,
+  COL_BUTTON_DANGER,
+  COL_TRACK_BG,
+  COL_TRACK_TICK,
+  COL_TRACK_HISTORY,
+  COL_TRACK_CURRENT,
+  COL_TRACK_CURRENT_PAUSED,
+  COL_TRACK_DOT,
+  COL_TRACK_DOT_SCRUB,
+  COL_TRACK_ARROW,
+  COL_TRACK_END,
+  COL_TRACK_MARKER,
+  COL_TEXT_PRIMARY,
+  COL_TEXT_SECONDARY,
+  COL_MODAL_BG,
+  TEXT_HIGHLIGHT,
+} from './theme';
 
 const TRACK_X = 120;
 const TRACK_W = VIEW_W - 200;
@@ -41,7 +61,9 @@ export class HudScene extends Phaser.Scene {
 
   create(): void {
     this.gfx = this.add.graphics();
-    const font = { fontFamily: 'monospace', fontSize: '14px', color: '#cfd8ff' };
+    const primary = COL_TEXT_PRIMARY();
+    const primaryCss = `#${primary.toString(16).padStart(6, '0')}`;
+    const font = { fontFamily: 'monospace', fontSize: '14px', color: primaryCss };
     this.status = this.add.text(16, VIEW_H + 10, '', font);
     this.clock = this.add.text(VIEW_W - 78, TRACK_Y - 9, '', { ...font, color: '#f7e26b' });
     this.banner = this.add
@@ -52,11 +74,13 @@ export class HudScene extends Phaser.Scene {
         align: 'center',
       })
       .setOrigin(0.5);
+    const accent = COL_TEXT_SECONDARY();
+    const accentCss = `#${accent.toString(16).padStart(6, '0')}`;
     this.hint = this.add
       .text(VIEW_W / 2, VIEW_H / 2 + 26, '', {
         fontFamily: 'monospace',
         fontSize: '15px',
-        color: '#b9c3ea',
+        color: accentCss,
         align: 'center',
       })
       .setOrigin(0.5);
@@ -73,7 +97,7 @@ export class HudScene extends Phaser.Scene {
       .text(MENU.x + MENU.w / 2, MENU.y + MENU.h / 2, 'LEVELS', {
         ...font,
         fontSize: '12px',
-        color: '#b9c3ea',
+        color: accentCss,
       })
       .setOrigin(0.5);
 
@@ -81,7 +105,7 @@ export class HudScene extends Phaser.Scene {
       .text(SOUND.x + SOUND.w / 2, SOUND.y + SOUND.h / 2, '', {
         ...font,
         fontSize: '12px',
-        color: '#b9c3ea',
+        color: accentCss,
       })
       .setOrigin(0.5);
 
@@ -137,38 +161,59 @@ export class HudScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
 
-    g.fillStyle(0x080512, 1).fillRect(0, VIEW_H, VIEW_W, PANEL_H);
-    g.fillStyle(0x6d4bd6, 0.6).fillRect(0, VIEW_H, VIEW_W, 2);
+    const panelBg = COL_PANEL_BG();
+    const hudBorder = COL_HUD_BORDER();
+    const buttonDefault = COL_BUTTON_DEFAULT();
+    const buttonDanger = COL_BUTTON_DANGER();
+    const trackBg = COL_TRACK_BG();
+    const trackTick = COL_TRACK_TICK();
+    const trackHistory = COL_TRACK_HISTORY();
+    const trackCurrent = COL_TRACK_CURRENT();
+    const trackCurrentPaused = COL_TRACK_CURRENT_PAUSED();
+    const trackDot = COL_TRACK_DOT();
+    const trackDotScrub = COL_TRACK_DOT_SCRUB();
+    const trackArrow = COL_TRACK_ARROW();
+    const trackEnd = COL_TRACK_END();
+    const trackMarker = COL_TRACK_MARKER();
+    const primary = COL_TEXT_PRIMARY();
+    const secondary = COL_TEXT_SECONDARY();
+    const modalBg = COL_MODAL_BG();
+    const highlight = TEXT_HIGHLIGHT();
+    const primaryCss = `#${primary.toString(16).padStart(6, '0')}`;
+    const secondaryCss = `#${secondary.toString(16).padStart(6, '0')}`;
+
+    g.fillStyle(panelBg, 1).fillRect(0, VIEW_H, VIEW_W, PANEL_H);
+    g.fillStyle(hudBorder, 0.6).fillRect(0, VIEW_H, VIEW_W, 2);
 
     const p = this.input.activePointer;
     const overAbandon = hit(ABANDON, p);
-    g.fillStyle(0xf43f5e, overAbandon ? 0.28 : 0.14).fillRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
-    g.lineStyle(1, 0xf43f5e, overAbandon ? 0.9 : 0.55).strokeRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
-    this.abandon.setColor(overAbandon ? '#ffffff' : '#ffb3c1');
+    g.fillStyle(buttonDanger, overAbandon ? 0.28 : 0.14).fillRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
+    g.lineStyle(1, buttonDanger, overAbandon ? 0.9 : 0.55).strokeRect(ABANDON.x, ABANDON.y, ABANDON.w, ABANDON.h);
+    this.abandon.setColor(overAbandon ? highlight : '#ffb3c1');
 
     const overSound = hit(SOUND, p);
-    g.fillStyle(0x6d4bd6, overSound ? 0.3 : 0.14).fillRect(SOUND.x, SOUND.y, SOUND.w, SOUND.h);
-    g.lineStyle(1, 0x6d4bd6, overSound ? 0.9 : 0.55).strokeRect(SOUND.x, SOUND.y, SOUND.w, SOUND.h);
+    g.fillStyle(buttonDefault, overSound ? 0.3 : 0.14).fillRect(SOUND.x, SOUND.y, SOUND.w, SOUND.h);
+    g.lineStyle(1, buttonDefault, overSound ? 0.9 : 0.55).strokeRect(SOUND.x, SOUND.y, SOUND.w, SOUND.h);
     this.soundBtn.setText(sfx.isMuted ? 'MUTED [M]' : 'SOUND [M]');
-    this.soundBtn.setColor(sfx.isMuted ? '#8892bd' : overSound ? '#ffffff' : '#b9c3ea');
+    this.soundBtn.setColor(sfx.isMuted ? secondaryCss : overSound ? highlight : primaryCss);
 
     const overMenu = hit(MENU, p);
-    g.fillStyle(0x6d4bd6, overMenu ? 0.3 : 0.14).fillRect(MENU.x, MENU.y, MENU.w, MENU.h);
-    g.lineStyle(1, 0x6d4bd6, overMenu ? 0.9 : 0.55).strokeRect(MENU.x, MENU.y, MENU.w, MENU.h);
-    this.menu.setColor(overMenu ? '#ffffff' : '#b9c3ea');
+    g.fillStyle(buttonDefault, overMenu ? 0.3 : 0.14).fillRect(MENU.x, MENU.y, MENU.w, MENU.h);
+    g.lineStyle(1, buttonDefault, overMenu ? 0.9 : 0.55).strokeRect(MENU.x, MENU.y, MENU.w, MENU.h);
+    this.menu.setColor(overMenu ? highlight : primaryCss);
 
     // Track background (drawn first so coloured segments sit on top)
-    g.fillStyle(0x1b1436, 1).fillRect(TRACK_X, TRACK_Y - 3, TRACK_W, 6);
+    g.fillStyle(trackBg, 1).fillRect(TRACK_X, TRACK_Y - 3, TRACK_W, 6);
     for (let i = 0; i <= 12; i++) {
       const x = TRACK_X + (i / 12) * TRACK_W;
-      g.fillStyle(0x38306a, 1).fillRect(x, TRACK_Y - 8, 1, 16);
+      g.fillStyle(trackTick, 1).fillRect(x, TRACK_Y - 8, 1, 16);
     }
 
     // recorded history coverage (drawn on top of the track)
     for (const run of w.runs) {
       const a = TRACK_X + (run.tMin / TICKS) * TRACK_W;
       const b = TRACK_X + (run.tMax / TICKS) * TRACK_W;
-      g.fillStyle(0x76d9ff, 0.35).fillRect(a, TRACK_Y - 2, Math.max(2, b - a), 5);
+      g.fillStyle(trackHistory, 0.35).fillRect(a, TRACK_Y - 2, Math.max(2, b - a), 5);
     }
     const cur = w.current;
     if (cur.tMax > cur.tMin) {
@@ -177,7 +222,7 @@ export class HudScene extends Phaser.Scene {
       // When the timeline is paused (player on a device), the current run's
       // recorded segment is all past — shown in blue like closed runs, not
       // yellow like an active present.
-      const color = w.paused ? 0x76d9ff : 0xf7e26b;
+      const color = w.paused ? trackCurrentPaused : trackCurrent;
       g.fillStyle(color, w.paused ? 0.35 : 0.5).fillRect(a, TRACK_Y - 2, Math.max(2, b - a), 5);
     }
 
@@ -186,7 +231,7 @@ export class HudScene extends Phaser.Scene {
     for (const box of w.boxes) {
       if (!box.immovable || box.releaseTick <= 0) continue;
       const mx = TRACK_X + (box.releaseTick / TICKS) * TRACK_W;
-      g.fillStyle(0x888888, 1.0).fillRect(mx - 4, TRACK_Y - 14, 8, 8);
+      g.fillStyle(trackMarker, 1.0).fillRect(mx - 4, TRACK_Y - 14, 8, 8);
     }
 
     // Anomaly markers: pulsing diamond shapes below the track, one per anomaly
@@ -203,20 +248,20 @@ export class HudScene extends Phaser.Scene {
       g.fillCircle(ax, TRACK_Y + 22, 3 + 4 * anomalyPulse);
     }
 
-    g.fillStyle(0xf43f5e, 0.9).fillRect(TRACK_X - 3, TRACK_Y - 12, 3, 24);
-    g.fillStyle(0xf43f5e, 0.9).fillRect(TRACK_X + TRACK_W, TRACK_Y - 12, 3, 24);
+    g.fillStyle(trackEnd, 0.9).fillRect(TRACK_X - 3, TRACK_Y - 12, 3, 24);
+    g.fillStyle(trackEnd, 0.9).fillRect(TRACK_X + TRACK_W, TRACK_Y - 12, 3, 24);
 
     const dotX = TRACK_X + (w.now / TICKS) * TRACK_W;
     const live = scene.canScrub();
-    g.fillStyle(live ? 0x38bdf8 : 0xf7e26b, 0.3).fillCircle(dotX, TRACK_Y, 14);
-    g.fillStyle(live ? 0x38bdf8 : 0xf7e26b, 1).fillCircle(dotX, TRACK_Y, 8);
-    g.fillStyle(0x08040f, 1).fillCircle(dotX, TRACK_Y, 3);
+    g.fillStyle(live ? trackDotScrub : trackDot, 0.3).fillCircle(dotX, TRACK_Y, 14);
+    g.fillStyle(live ? trackDotScrub : trackDot, 1).fillCircle(dotX, TRACK_Y, 8);
+    g.fillStyle(modalBg, 1).fillCircle(dotX, TRACK_Y, 3);
 
     // The direction of time, drawn only while time is going anywhere.
     if (!w.paused) {
       const ax = 92;
       const s = w.dir;
-      g.fillStyle(0x76d9ff, 1);
+      g.fillStyle(trackArrow, 1);
       g.fillRect(ax - 22, TRACK_Y - 2, 30, 4);
       g.fillTriangle(
         ax + (s === 1 ? 8 : -22),
@@ -252,6 +297,7 @@ export class HudScene extends Phaser.Scene {
 
   private drawOverlay(scene: GameScene): void {
     const g = this.gfx;
+    const modalBg = COL_MODAL_BG();
     switch (scene.state) {
       case 'won': {
         // Nothing over the top of the gate taking the body: the banner waits for it.
@@ -260,9 +306,9 @@ export class HudScene extends Phaser.Scene {
           this.hint.setText('');
           break;
         }
-        g.fillStyle(0x05030a, 0.72).fillRect(0, 0, VIEW_W, VIEW_H);
+        g.fillStyle(modalBg, 0.72).fillRect(0, 0, VIEW_W, VIEW_H);
         this.banner.setText('TIMELINE RESOLVED').setColor('#f7e26b');
-        this.hint.setText(scene.hasNextLevel ? '[ENTER] next level' : '[ENTER] play again');
+        this.hint.setText(scene.hasNextLevel ? '[ENTER] next level' : '[ENTER] return to menu');
         break;
       }
       case 'dust':
