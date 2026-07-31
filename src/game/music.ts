@@ -200,7 +200,7 @@ class Music {
         const arpPatLen = ARP_NOTES.length; // 16
         // Round totalSteps down to a multiple of the pattern length so the
         // arpeggio always completes a full phrase at the loop boundary.
-        const totalSteps = Math.floor(dur * ARP_RATE / arpPatLen) * arpPatLen;
+        const totalSteps = Math.ceil(dur * ARP_RATE);
         for (let i = 0; i < totalSteps; i++) {
             const t = i * stepLen;
             const noteIdx = i % arpPatLen;
