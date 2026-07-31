@@ -51,9 +51,6 @@ class Music {
         return this.muted;
     }
 
-    /** Unlock the audio context (call from a user gesture).
-     *  Creates the context eagerly so it starts in a running state, or resumes
-     *  an existing suspended context. */
     unlock(): void {
         const ctx = this.context();
         if (ctx && ctx.state === 'suspended') void ctx.resume();
@@ -73,7 +70,6 @@ class Music {
         return this.ctx;
     }
 
-    /** Pre-render both tracks. Call once after user interaction. */
     async init(): Promise<void> {
         if (this.menuBuffer && this.levelBuffer) return;
         if (this._initPromise) return this._initPromise;
@@ -90,7 +86,6 @@ class Music {
 
     // ────────────────────────────────────────────────────────────────
     //  MENU TRACK  —  "Chronosphere"
-    //  Looping ambient / arpeggiated piece, ~16 s.
     // ────────────────────────────────────────────────────────────────
     private async renderMenu(): Promise<AudioBuffer> {
         const sr = 44100;
@@ -99,10 +94,9 @@ class Music {
         const len = sr * dur;
         const ctx = new OfflineAudioContext(2, len, sr);
 
-        // ── EDITABLE PARAMETERS ───────────────────────────────────────
-        const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4]; // Cm7
+        const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4];
         const PAD_WAVE: OscillatorType = 'sawtooth';
-        const PAD_DETUNE_CT = 6; // cents
+        const PAD_DETUNE_CT = 6;
         const PAD_VOLUME = 0.1;
         const PAD_FILTER_CUTOFF = 900;
         const PAD_FILTER_LFO_DEPTH = 350;
@@ -110,30 +104,25 @@ class Music {
 
         const BASS_PATTERN = [Hz.C2, Hz.G2, Hz.Bb2, Hz.G2];
         const BASS_VOLUME = 0.45;
-        const BASS_DECAY = 0.40; // fraction of beat
+        const BASS_DECAY = 0.40;
 
-        // Two alternating 8-note phrases for variety; total pattern = 16 notes
         const ARP_PHRASE_A = [Hz.C4, Hz.Eb4, Hz.G4, Hz.Bb4, Hz.C5, Hz.Bb4, Hz.G4, Hz.Eb4];
         const ARP_PHRASE_B = [Hz.G4, Hz.Bb4, Hz.Eb5, Hz.D5, Hz.C5, Hz.G4, Hz.Eb4, Hz.C4];
         const ARP_NOTES = [...ARP_PHRASE_A, ...ARP_PHRASE_B];
         const ARP_WAVE: OscillatorType = 'triangle';
         const ARP_VOLUME = 0.6;
-        // Per-note velocity to add organic variation (indexed by position in 16-note pattern)
         const ARP_VELOCITIES = [0.14, 0.09, 0.12, 0.08, 0.14, 0.10, 0.11, 0.08,
             0.11, 0.08, 0.14, 0.10, 0.12, 0.09, 0.08, 0.13];
 
         const NOISE_VOLUME = 0.0042;
         const NOISE_FILTER_FREQ = 2200;
-        // ── END EDITABLE PARAMETERS ───────────────────────────────────
 
         const beatLen = 60 / BPM;
 
-        // Master
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.55, 0);
         master.connect(ctx.destination);
 
-        // ── Pad ───────────────────────────────────────────────────────
         const padGain = ctx.createGain();
         padGain.gain.setValueAtTime(PAD_VOLUME, 0);
         const padFilter = ctx.createBiquadFilter();
@@ -165,7 +154,6 @@ class Music {
             }
         }
 
-        // ── Bass ──────────────────────────────────────────────────────
         const bassGain = ctx.createGain();
         bassGain.gain.setValueAtTime(0, 0);
         const bassOsc = ctx.createOscillator();
@@ -185,7 +173,6 @@ class Music {
             bassGain.gain.linearRampToValueAtTime(0, t + beatLen * BASS_DECAY);
         }
 
-        // ── Arpeggio ──────────────────────────────────────────────────
         const arpGain = ctx.createGain();
         arpGain.gain.setValueAtTime(0, 0);
         const arpOsc = ctx.createOscillator();
@@ -196,9 +183,7 @@ class Music {
         arpOsc.stop(dur);
 
         const stepLen = 60 / BPM
-        const arpPatLen = ARP_NOTES.length; // 16
-        // Round totalSteps down to a multiple of the pattern length so the
-        // arpeggio always completes a full phrase at the loop boundary.
+        const arpPatLen = ARP_NOTES.length;
         const totalSteps = 16;
         for (let i = 0; i < totalSteps; i++) {
             const t = i * stepLen;
@@ -210,7 +195,6 @@ class Music {
             arpGain.gain.linearRampToValueAtTime(0, t + stepLen * 0.65);
         }
 
-        // ── Noise texture ─────────────────────────────────────────────
         const noiseLen = sr * dur;
         const noiseBuf = ctx.createBuffer(1, noiseLen, sr);
         const nd = noiseBuf.getChannelData(0);
@@ -251,20 +235,18 @@ class Music {
         const BPM = 128;
         const SECTION_LEN = 10;
 
-        // Pad: detuned sawtooth supersaw (3 voices per note, ±8 cents)
         const PAD_DETUNE_CT = 8;
         const PAD_CHORDS: number[][] = [
-            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],   // sec 0: Em
-            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],   // sec 1: Em
-            [Hz.D2, Hz.A2, Hz.Fs3, Hz.A3],  // sec 2: D
-            [Hz.C2, Hz.G2, Hz.E3, Hz.G3],   // sec 3: C
-            [Hz.E2, Hz.Fs2, Hz.B2, Hz.Eb3], // sec 4: B (tension)
-            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],   // sec 5: Em (resolution)
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
+            [Hz.D2, Hz.A2, Hz.Fs3, Hz.A3],
+            [Hz.C2, Hz.G2, Hz.E3, Hz.G3],
+            [Hz.E2, Hz.Fs2, Hz.B2, Hz.Eb3],
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
         ];
         const PAD_VOLUMES = [0.22, 0.22, 0.24, 0.26, 0.30, 0.20];
         const PAD_FILTER_FREQS = [600, 800, 1000, 1200, 1600, 700];
 
-        // Bass: sawtooth + sub-sine, punchy quarter notes from bar 1
         const BASS_PATTERNS: number[][] = [
             [Hz.E2, Hz.E2, Hz.G2, Hz.B2],
             [Hz.E2, Hz.E2, Hz.G2, Hz.B2],
@@ -276,7 +258,6 @@ class Music {
         const BASS_VOLUME = 0.55;
         const BASS_DECAY = 0.40;
 
-        // Arpeggio: triangle, 16th notes, entering at section 1
         const ARP_PATTERNS: number[][] = [
             [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
             [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
@@ -287,32 +268,24 @@ class Music {
         ];
         const ARP_VOLUMES = [0, 0.18, 0.20, 0.22, 0.25, 0.16];
 
-        // Kick: punchy sine pitch-drop, beats 1 & 3 throughout
         const KICK_VOLUME = 0.55;
         const KICK_FREQ_START = 120;
         const KICK_FREQ_END = 35;
 
-        // Snare: bandpass noise burst, beats 2 & 4, entering at section 3
         const SNARE_VOLUMES = [0, 0, 0, 0.18, 0.22, 0.18];
 
-        // Hi-hat: highpass noise, 8th-note off-beats, entering at section 1
         const HAT_VOLUMES = [0, 0.06, 0.07, 0.08, 0.10, 0.07];
         const HAT_CUTOFF = 7000;
 
-        // Lead: filtered square wave, quarter notes, entering at section 2
         const LEAD_VOLUMES = [0, 0, 0.18, 0.22, 0.28, 0.20];
         const LEAD_FILTER_FREQ = 1800;
         const LEAD_NOTES: number[] = [
-            // sec 2 (D)
             Hz.Fs5, Hz.E5, Hz.D5, Hz.A4, Hz.D5, Hz.Fs5, Hz.A5, Hz.Fs5,
             Hz.G5, Hz.Fs5, Hz.E5, Hz.D5, Hz.E5, Hz.D5, Hz.Cs5, Hz.D5,
-            // sec 3 (C)
             Hz.E5, Hz.G5, Hz.C5, Hz.E5, Hz.G5, Hz.E5, Hz.D5, Hz.C5,
             Hz.B4, Hz.C5, Hz.D5, Hz.E5, Hz.G5, Hz.E5, Hz.C5, Hz.B4,
-            // sec 4 (tension)
             Hz.B5, Hz.A5, Hz.Fs5, Hz.E5, Hz.Fs5, Hz.Ab5, Hz.B5, Hz.Fs5,
             Hz.E5, Hz.Fs5, Hz.B5, Hz.A5, Hz.Ab5, Hz.Fs5, Hz.E5, Hz.Eb5,
-            // sec 5 (Em resolution)
             Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.D5,
             Hz.B4, Hz.G4, Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.G5, Hz.E5,
         ];
@@ -322,13 +295,10 @@ class Music {
         const beatsPerSection = SECTION_LEN / beatLen;
         const sixteenthLen = beatLen / 4;
 
-        // Master — matched to menu track internal gain so both sit at the same
-        // perceived volume through the shared external 0.35 master node
         const master = ctx.createGain();
-        master.gain.setValueAtTime(0.35, 0);
+        master.gain.setValueAtTime(0.18, 0);
         master.connect(ctx.destination);
 
-        // ── Detuned pad (supersaw-style) ──────────────────────────────
         const padFilter = ctx.createBiquadFilter();
         padFilter.type = 'lowpass';
         padFilter.Q.setValueAtTime(0.7, 0);
@@ -362,7 +332,6 @@ class Music {
             }
         }
 
-        // ── Bass (sawtooth + sub sine) ────────────────────────────────
         const bassFilter = ctx.createBiquadFilter();
         bassFilter.type = 'lowpass';
         bassFilter.frequency.setValueAtTime(400, 0);
@@ -378,7 +347,7 @@ class Music {
         bassOsc.stop(dur);
 
         const subGain = ctx.createGain();
-        subGain.gain.setValueAtValue(0, 0);
+        subGain.gain.setValueAtTime(0, 0);
         const subOsc = ctx.createOscillator();
         subOsc.type = 'sine';
         subOsc.frequency.setValueAtTime(Hz.E2 / 2, 0);
@@ -403,7 +372,6 @@ class Music {
             }
         }
 
-        // ── Kick (sine pitch-drop) ──────────────────────────────────────
         const kickGain = ctx.createGain();
         kickGain.gain.setValueAtTime(0, 0);
         const kickOsc = ctx.createOscillator();
@@ -423,7 +391,6 @@ class Music {
             kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
         }
 
-        // ── Snare (bandpass noise burst) ──────────────────────────────
         const snareNoiseBuf = ctx.createBuffer(1, sr * dur, sr);
         const snd = snareNoiseBuf.getChannelData(0);
         for (let i = 0; i < snd.length; i++) snd[i] = Math.random() * 2 - 1;
@@ -451,7 +418,6 @@ class Music {
             }
         }
 
-        // ── Hi-hat (highpass noise) ────────────────────────────────────
         const hatNoiseBuf = ctx.createBuffer(1, sr * dur, sr);
         const hnd = hatNoiseBuf.getChannelData(0);
         for (let i = 0; i < hnd.length; i++) hnd[i] = Math.random() * 2 - 1;
@@ -480,7 +446,6 @@ class Music {
             }
         }
 
-        // ── Arpeggio ──────────────────────────────────────────────────
         const arpGain = ctx.createGain();
         arpGain.gain.setValueAtTime(0, 0);
         const arpOsc = ctx.createOscillator();
@@ -508,7 +473,6 @@ class Music {
             }
         }
 
-        // ── Lead melody (filtered square) ──────────────────────────────
         const leadGain = ctx.createGain();
         leadGain.gain.setValueAtTime(0, 0);
         const leadOsc = ctx.createOscillator();
@@ -548,7 +512,6 @@ class Music {
     //  Playback
     // ────────────────────────────────────────────────────────────────
 
-    /** Start looping menu music. Stops any level music first. */
     async playMenu(): Promise<void> {
         if (this._menuPlaying) return;
         await this.init();
@@ -562,11 +525,9 @@ class Music {
         this.menuSource.loop = true;
         this.menuSource.connect(this.master);
 
-        // ── Fade in over 2 seconds to avoid an abrupt start ───────────
         const targetGain = this.muted ? 0 : 0.35;
         this.master.gain.setValueAtTime(0, ctx.currentTime);
         this.master.gain.linearRampToValueAtTime(targetGain, ctx.currentTime + 2.0);
-        // ─────────────────────────────────────────────────────────────
 
         this.menuSource.start(0);
     }
@@ -574,7 +535,6 @@ class Music {
     stopMenu(): void {
         this._menuPlaying = false;
         if (this.master && this.ctx) {
-            // Snap gain back so the next playMenu() fade-in starts clean
             this.master.gain.cancelScheduledValues(this.ctx.currentTime);
             this.master.gain.setValueAtTime(this.muted ? 0 : 0.35, this.ctx.currentTime);
         }
@@ -585,7 +545,6 @@ class Music {
         }
     }
 
-    /** Start level music from the beginning. Stops any menu music first. */
     async playLevel(): Promise<void> {
         if (this._levelPlaying) return;
         await this.init();
@@ -602,15 +561,9 @@ class Music {
         this.levelSource.start(0, 0);
     }
 
-    /**
-     * Seek the level music to match a timeline position.
-     * `tick` is 0-3600, mapped to 0-60 seconds of audio.
-     * Throttled: only re-creates the buffer source when the tick actually changes.
-     */
     seekLevel(tick: number): void {
         if (!this._levelPlaying || !this.ctx || !this.master || !this.levelBuffer)
             return;
-        // Round to nearest tick to avoid micro-seeks on floating-point drift.
         const snapped = Math.round(tick);
         if (snapped === this.lastSeekTick && this.levelSource) return;
         this.lastSeekTick = snapped;
