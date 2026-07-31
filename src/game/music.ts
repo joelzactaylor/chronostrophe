@@ -51,6 +51,10 @@ class Music {
     private pausedOffset = 0;
     /** The ctx.currentTime at which the current levelSource conceptually started (offset-adjusted), used to detect drift. */
     private sourceStartedAt = 0;
+    /** ctx.currentTime of the last hard reseek (buffer source restart), used to throttle restarts during scrubbing/reverse. */
+    private lastReseekAt = -Infinity;
+    /** The buffer offset used on the most recent seekLevel call, used to detect direction (forward/reverse). */
+    private lastOffset = 0;
 
     get isMuted(): boolean {
         return this.muted;
@@ -116,13 +120,13 @@ class Music {
         const ARP_NOTES = [...ARP_PHRASE_A, ...ARP_PHRASE_B];
         const ARP_WAVE: OscillatorType = 'triangle';
         const ARP_VOLUME = 0.6;
-        const ARP_VELOCITIES = [0.14, 0.09, 0.12, 0.08, 0.14, 0.10, 0.11, 0.08,
-            0.11, 0.08, 0.14, 0.10, 0.12, 0.09, 0.08, 0.13];
+        const ARP_VELOCITIES = [0.14, 0.09, 0.12, 0.08, 0.14, 0.10, 0.11, 0.08, 0.11, 0.08, 0.14, 0.10, 0.12, 0.09, 0.08, 0.13];
 
         const NOISE_VOLUME = 0.0042;
         const NOISE_FILTER_FREQ = 2200;
 
         const beatLen = 60 / BPM;
+
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.55, 0);
         master.connect(ctx.destination);
@@ -234,15 +238,15 @@ class Music {
     //
     //   0-10 s   Groove only — pad + bass, no arp (mirrors the menu's
     //            own opening bars before the arp comes in)
-    //  10-20 s   Phrase A, at the menu's own octave
-    //  20-30 s   Phrase B, shifted up an octave, half-time — a
+    //   10-20 s  Phrase A, at the menu's own octave
+    //   20-30 s  Phrase B, shifted up an octave, half-time — a
     //            deliberately different contour so it doesn't feel
     //            like a repeat of the last segment
-    //  30-40 s   The menu's full 16-note theme (A + B back to back),
+    //   30-40 s  The menu's full 16-note theme (A + B back to back),
     //            quoted directly
-    //  40-50 s   Climax — phrase A doubled in octaves as a fast
+    //   40-50 s  Climax — phrase A doubled in octaves as a fast
     //            call-and-response, full percussion
-    //  50-60 s   Phrase B alone, slowed down, percussion stripped back
+    //   50-60 s  Phrase B alone, slowed down, percussion stripped back
     //            — winds back to the intro feel so the loop point
     //            doesn't jar
     // ─────────────────────────────────────────────────
@@ -252,11 +256,12 @@ class Music {
         const len = sr * dur;
         const ctx = new OfflineAudioContext(2, len, sr);
 
-        // ── EDITABLE PARAMETERS ─────────────────────────────────────
+        // ── EDITABLE PARAMETERS ────────────────────────────────
         const BPM = 240; // same tempo as the menu track
         const SECTION_LEN = 10;
         const stepLen = 60 / BPM; // same step length the menu arp uses
         const beatLen = stepLen; // "beat" here = one menu-arp step
+
         const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4]; // identical chord to the menu pad
         const PAD_WAVE: OscillatorType = 'sawtooth';
         const PAD_DETUNE_CT = 6;
@@ -294,7 +299,7 @@ class Music {
             { arp: ARP_CLIMAX, arpStepLen: stepLen / 2, bassEvery: 1, kick: true, snare: true, hat: true, volume: 1.15 },
             { arp: ARP_PHRASE_B, arpStepLen: stepLen * 1.5, bassEvery: 1, kick: true, snare: false, hat: false, volume: 0.75 },
         ];
-        // ── END EDITABLE PARAMETERS ────────────────────────────────────
+        // ── END EDITABLE PARAMETERS ────────────────────────────────
 
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.5, 0);
@@ -509,6 +514,8 @@ class Music {
         this._levelPaused = false;
         this.lastSeekTick = 0;
         this.pausedOffset = 0;
+        this.lastOffset = 0;
+        this.lastReseekAt = ctx.currentTime;
         this.levelSource = ctx.createBufferSource();
         this.levelSource.buffer = this.levelBuffer;
         this.levelSource.loop = false;
@@ -522,37 +529,56 @@ class Music {
      * (see pauseLevel()), this is a no-op — the buffer source stays
      * frozen at the tick pauseLevel() captured it at, so the music
      * genuinely stops advancing rather than silently drifting on.
+     *
+     * A hard reseek (stopping and restarting the buffer source at the
+     * new offset) only happens when needed: on a big jump/scrub, or
+     * when the playback direction reverses. Simply comparing elapsed
+     * wall-clock time against the target offset isn't enough during
+     * reverse playback, since a forward-only AudioBufferSourceNode's
+     * "expected" position runs the wrong way — that mismatch was
+     * causing constant reseeking (and the doubled/garbled notes) while
+     * scrubbing backwards. Instead we track the last direction and
+     * force a reseek whenever it flips, and throttle reseeks so we
+     * don't restart the source more than a few times a second.
      */
     seekLevel(tick: number): void {
-    if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer)
-        return;
-    const snapped = Math.round(tick);
-    if (snapped === this.lastSeekTick && this.levelSource) return;
-    const offset = (snapped / 3600) * 60;
-    const clampedOffset = Math.max(0, Math.min(offset, 59.99));
-    // If a source is already playing and roughly where it should be for
-    // normal forward (or reverse) playback, leave it running rather than
-    // restarting it every frame -- that's what was causing the crackling.
-    // Only force a hard reseek when the drift between where the source
-    // should be and where it actually is has grown large (e.g. scrub,
-    // pause/resume, or a big timeline jump).
-    if (this.levelSource) {
-        const expectedElapsed = this.ctx.currentTime - this.sourceStartedAt;
-        const drift = Math.abs(expectedElapsed - clampedOffset);
+        if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer) return;
+        const snapped = Math.round(tick);
+        if (snapped === this.lastSeekTick && this.levelSource) return;
+
+        const offset = (snapped / 3600) * 60;
+        const clampedOffset = Math.max(0, Math.min(offset, 59.99));
+        const reversed = clampedOffset < this.lastOffset;
         this.lastSeekTick = snapped;
-        if (drift < 0.2) return;
-        try { this.levelSource.stop(); } catch { /* already stopped */ }
-        this.levelSource.disconnect();
-    } else {
-        this.lastSeekTick = snapped;
+
+        if (this.levelSource) {
+            const expectedElapsed = this.ctx.currentTime - this.sourceStartedAt;
+            const drift = Math.abs(expectedElapsed - clampedOffset);
+            const sinceLastReseek = this.ctx.currentTime - this.lastReseekAt;
+            // Always reseek on a direction flip (forward<->reverse) since the
+            // running source can only ever play forward in real time and will
+            // otherwise diverge from the timeline immediately. Otherwise only
+            // reseek when drift has grown large, and throttle to avoid
+            // creating buffer sources every frame (the cause of crackling).
+            const needsReseek = reversed || drift > 0.2;
+            if (!needsReseek || sinceLastReseek < 0.05) {
+                this.lastOffset = clampedOffset;
+                return;
+            }
+            try { this.levelSource.stop(); } catch { /* already stopped */ }
+            this.levelSource.disconnect();
+        }
+
+        this.levelSource = this.ctx.createBufferSource();
+        this.levelSource.buffer = this.levelBuffer;
+        this.levelSource.loop = false;
+        this.levelSource.connect(this.master);
+        this.levelSource.start(0, clampedOffset);
+        this.sourceStartedAt = this.ctx.currentTime - clampedOffset;
+        this.lastReseekAt = this.ctx.currentTime;
+        this.lastOffset = clampedOffset;
     }
-    this.levelSource = this.ctx.createBufferSource();
-    this.levelSource.buffer = this.levelBuffer;
-    this.levelSource.loop = false;
-    this.levelSource.connect(this.master);
-    this.levelSource.start(0, clampedOffset);
-    this.sourceStartedAt = this.ctx.currentTime - clampedOffset;
-}
+
     /**
      * Freeze the level track at its current position. Actually stops
      * the underlying buffer source (rather than just leaving seekLevel
@@ -576,12 +602,15 @@ class Music {
         if (!this._levelPlaying || !this._levelPaused) return;
         this._levelPaused = false;
         if (!this.ctx || !this.master || !this.levelBuffer) return;
+        const offset = Math.max(0, Math.min(this.pausedOffset, 59.99));
         this.levelSource = this.ctx.createBufferSource();
         this.levelSource.buffer = this.levelBuffer;
         this.levelSource.loop = false;
         this.levelSource.connect(this.master);
-        this.levelSource.start(0, Math.max(0, Math.min(this.pausedOffset, 59.99)));
-        this.sourceStartedAt = this.ctx.currentTime - Math.max(0, Math.min(this.pausedOffset, 59.99));
+        this.levelSource.start(0, offset);
+        this.sourceStartedAt = this.ctx.currentTime - offset;
+        this.lastReseekAt = this.ctx.currentTime;
+        this.lastOffset = offset;
     }
 
     stopLevel(): void {
