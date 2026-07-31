@@ -513,11 +513,23 @@ class Music {
         this.menuSource.buffer = this.menuBuffer;
         this.menuSource.loop = true;
         this.menuSource.connect(this.master);
+
+        // ── Fade in over 2 seconds to avoid an abrupt start ───────────
+        const targetGain = this.muted ? 0 : 0.35;
+        this.master.gain.setValueAtTime(0, ctx.currentTime);
+        this.master.gain.linearRampToValueAtTime(targetGain, ctx.currentTime + 2.0);
+        // ─────────────────────────────────────────────────────────────
+
         this.menuSource.start(0);
     }
 
     stopMenu(): void {
         this._menuPlaying = false;
+        if (this.master && this.ctx) {
+            // Snap gain back so the next playMenu() fade-in starts clean
+            this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+            this.master.gain.setValueAtTime(this.muted ? 0 : 0.35, this.ctx.currentTime);
+        }
         if (this.menuSource) {
             try { this.menuSource.stop(); } catch { /* already stopped */ }
             this.menuSource?.disconnect();
