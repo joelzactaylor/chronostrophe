@@ -322,9 +322,10 @@ class Music {
         const beatsPerSection = SECTION_LEN / beatLen;
         const sixteenthLen = beatLen / 4;
 
-        // Master — boosted headroom
+        // Master — matched to menu track internal gain so both sit at the same
+        // perceived volume through the shared external 0.35 master node
         const master = ctx.createGain();
-        master.gain.setValueAtTime(0.70, 0);
+        master.gain.setValueAtTime(0.35, 0);
         master.connect(ctx.destination);
 
         // ── Detuned pad (supersaw-style) ──────────────────────────────
@@ -377,7 +378,7 @@ class Music {
         bassOsc.stop(dur);
 
         const subGain = ctx.createGain();
-        subGain.gain.setValueAtTime(0, 0);
+        subGain.gain.setValueAtValue(0, 0);
         const subOsc = ctx.createOscillator();
         subOsc.type = 'sine';
         subOsc.frequency.setValueAtTime(Hz.E2 / 2, 0);
