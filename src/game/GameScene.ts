@@ -400,6 +400,7 @@ export class GameScene extends Phaser.Scene {
     if (rectsOverlap(pr, { x: ex.x - ex.r, y: ex.y - ex.r, w: ex.r * 2, h: ex.r * 2 })) {
       this.state = 'won';
       this.message = 'TIMELINE RESOLVED';
+      music.stopLevel();
       if (this.draft === null) markLevelComplete(this.levelIndex);
       this.beginCapture();
       return;
@@ -501,6 +502,7 @@ export class GameScene extends Phaser.Scene {
     if (this.state !== 'play') return;
     this.state = kind;
     this.message = why;
+    music.stopLevel();
     this.effectT = 0;
     this.cameras.main.stopFollow();
     if (kind === 'dust') {
