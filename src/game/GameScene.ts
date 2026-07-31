@@ -249,8 +249,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.canScrub()) return;
     if (t !== this.world.now) sfx.scrubTick();
     this.world.scrubTo(t);
+    music.pauseLevel();
     music.seekLevel(t);
-  }
+}
 
   canScrub(): boolean {
     // Only the chronoporter repositions the world in time; the anachroverter
@@ -284,8 +285,14 @@ export class GameScene extends Phaser.Scene {
     this.followTarget.x = this.world.player.x + 10;
     this.followTarget.y = this.world.player.y + 14;
     this.beatForAnomalies();
-    // Sync level music position to the current timeline tick.
-    music.seekLevel(this.world.now);
+    // Sync level music to the current timeline tick, or freeze it in
+    // place while time itself is paused.
+    if (this.world.paused) {
+      music.pauseLevel();
+    } else {
+      music.resumeLevel();
+      music.seekLevel(this.world.now);
+    }
     this.render();
   }
 
