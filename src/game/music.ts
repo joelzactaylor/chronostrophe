@@ -49,6 +49,8 @@ class Music {
     private _levelPaused = false;
     /** The buffer offset (seconds) the level track was frozen at. */
     private pausedOffset = 0;
+    /** The ctx.currentTime at which the current levelSource conceptually started (offset-adjusted), used to detect drift. */
+    private sourceStartedAt = 0;
 
     get isMuted(): boolean {
         return this.muted;
@@ -512,6 +514,7 @@ class Music {
         this.levelSource.loop = false;
         this.levelSource.connect(this.master);
         this.levelSource.start(0, 0);
+        this.sourceStartedAt = ctx.currentTime;
     }
 
     /**
@@ -521,23 +524,35 @@ class Music {
      * genuinely stops advancing rather than silently drifting on.
      */
     seekLevel(tick: number): void {
-        if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer)
-            return;
-        const snapped = Math.round(tick);
-        if (snapped === this.lastSeekTick && this.levelSource) return;
+    if (!this._levelPlaying || this._levelPaused || !this.ctx || !this.master || !this.levelBuffer)
+        return;
+    const snapped = Math.round(tick);
+    if (snapped === this.lastSeekTick && this.levelSource) return;
+    const offset = (snapped / 3600) * 60;
+    const clampedOffset = Math.max(0, Math.min(offset, 59.99));
+    // If a source is already playing and roughly where it should be for
+    // normal forward (or reverse) playback, leave it running rather than
+    // restarting it every frame -- that's what was causing the crackling.
+    // Only force a hard reseek when the drift between where the source
+    // should be and where it actually is has grown large (e.g. scrub,
+    // pause/resume, or a big timeline jump).
+    if (this.levelSource) {
+        const expectedElapsed = this.ctx.currentTime - this.sourceStartedAt;
+        const drift = Math.abs(expectedElapsed - clampedOffset);
         this.lastSeekTick = snapped;
-        const offset = (snapped / 3600) * 60;
-        if (this.levelSource) {
-            try { this.levelSource.stop(); } catch { /* already stopped */ }
-            this.levelSource?.disconnect();
-        }
-        this.levelSource = this.ctx.createBufferSource();
-        this.levelSource.buffer = this.levelBuffer;
-        this.levelSource.loop = false;
-        this.levelSource.connect(this.master);
-        this.levelSource.start(0, Math.max(0, Math.min(offset, 59.99)));
+        if (drift < 0.2) return;
+        try { this.levelSource.stop(); } catch { /* already stopped */ }
+        this.levelSource.disconnect();
+    } else {
+        this.lastSeekTick = snapped;
     }
-
+    this.levelSource = this.ctx.createBufferSource();
+    this.levelSource.buffer = this.levelBuffer;
+    this.levelSource.loop = false;
+    this.levelSource.connect(this.master);
+    this.levelSource.start(0, clampedOffset);
+    this.sourceStartedAt = this.ctx.currentTime - clampedOffset;
+}
     /**
      * Freeze the level track at its current position. Actually stops
      * the underlying buffer source (rather than just leaving seekLevel
@@ -566,6 +581,7 @@ class Music {
         this.levelSource.loop = false;
         this.levelSource.connect(this.master);
         this.levelSource.start(0, Math.max(0, Math.min(this.pausedOffset, 59.99)));
+        this.sourceStartedAt = this.ctx.currentTime - Math.max(0, Math.min(this.pausedOffset, 59.99));
     }
 
     stopLevel(): void {
