@@ -103,7 +103,7 @@ class Music {
         const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4]; // Cm7
         const PAD_WAVE: OscillatorType = 'sawtooth';
         const PAD_DETUNE_CT = 6; // cents
-        const PAD_VOLUME = 0.4;
+        const PAD_VOLUME = 0.1;
         const PAD_FILTER_CUTOFF = 900;
         const PAD_FILTER_LFO_DEPTH = 350;
         const PAD_FILTER_LFO_RATE = 0.12;
@@ -117,7 +117,7 @@ class Music {
         const ARP_PHRASE_B = [Hz.G4, Hz.Bb4, Hz.Eb5, Hz.D5, Hz.C5, Hz.G4, Hz.Eb4, Hz.C4];
         const ARP_NOTES = [...ARP_PHRASE_A, ...ARP_PHRASE_B];
         const ARP_WAVE: OscillatorType = 'triangle';
-        const ARP_VOLUME = 1;
+        const ARP_VOLUME = 0.6;
         // Per-note velocity to add organic variation (indexed by position in 16-note pattern)
         const ARP_VELOCITIES = [0.14, 0.09, 0.12, 0.08, 0.14, 0.10, 0.11, 0.08,
             0.11, 0.08, 0.14, 0.10, 0.12, 0.09, 0.08, 0.13];
@@ -261,7 +261,7 @@ class Music {
             [Hz.E2, Hz.Fs2, Hz.B2, Hz.Eb3], // sec 4: B (tension)
             [Hz.E2, Hz.B2, Hz.G3, Hz.B3],   // sec 5: Em (resolution)
         ];
-        const PAD_VOLUMES   = [0.22, 0.22, 0.24, 0.26, 0.30, 0.20];
+        const PAD_VOLUMES = [0.22, 0.22, 0.24, 0.26, 0.30, 0.20];
         const PAD_FILTER_FREQS = [600, 800, 1000, 1200, 1600, 700];
 
         // Bass: sawtooth + sub-sine, punchy quarter notes from bar 1
@@ -274,7 +274,7 @@ class Music {
             [Hz.E2, Hz.E2, Hz.B2, Hz.E2],
         ];
         const BASS_VOLUME = 0.55;
-        const BASS_DECAY  = 0.40;
+        const BASS_DECAY = 0.40;
 
         // Arpeggio: triangle, 16th notes, entering at section 1
         const ARP_PATTERNS: number[][] = [
@@ -288,39 +288,39 @@ class Music {
         const ARP_VOLUMES = [0, 0.18, 0.20, 0.22, 0.25, 0.16];
 
         // Kick: punchy sine pitch-drop, beats 1 & 3 throughout
-        const KICK_VOLUME     = 0.55;
+        const KICK_VOLUME = 0.55;
         const KICK_FREQ_START = 120;
-        const KICK_FREQ_END   = 35;
+        const KICK_FREQ_END = 35;
 
         // Snare: bandpass noise burst, beats 2 & 4, entering at section 3
         const SNARE_VOLUMES = [0, 0, 0, 0.18, 0.22, 0.18];
 
         // Hi-hat: highpass noise, 8th-note off-beats, entering at section 1
         const HAT_VOLUMES = [0, 0.06, 0.07, 0.08, 0.10, 0.07];
-        const HAT_CUTOFF  = 7000;
+        const HAT_CUTOFF = 7000;
 
         // Lead: filtered square wave, quarter notes, entering at section 2
-        const LEAD_VOLUMES     = [0, 0, 0.18, 0.22, 0.28, 0.20];
+        const LEAD_VOLUMES = [0, 0, 0.18, 0.22, 0.28, 0.20];
         const LEAD_FILTER_FREQ = 1800;
         const LEAD_NOTES: number[] = [
             // sec 2 (D)
-            Hz.Fs5, Hz.E5,  Hz.D5,  Hz.A4,  Hz.D5,  Hz.Fs5, Hz.A5,  Hz.Fs5,
-            Hz.G5,  Hz.Fs5, Hz.E5,  Hz.D5,  Hz.E5,  Hz.D5,  Hz.Cs5, Hz.D5,
+            Hz.Fs5, Hz.E5, Hz.D5, Hz.A4, Hz.D5, Hz.Fs5, Hz.A5, Hz.Fs5,
+            Hz.G5, Hz.Fs5, Hz.E5, Hz.D5, Hz.E5, Hz.D5, Hz.Cs5, Hz.D5,
             // sec 3 (C)
-            Hz.E5,  Hz.G5,  Hz.C5,  Hz.E5,  Hz.G5,  Hz.E5,  Hz.D5,  Hz.C5,
-            Hz.B4,  Hz.C5,  Hz.D5,  Hz.E5,  Hz.G5,  Hz.E5,  Hz.C5,  Hz.B4,
+            Hz.E5, Hz.G5, Hz.C5, Hz.E5, Hz.G5, Hz.E5, Hz.D5, Hz.C5,
+            Hz.B4, Hz.C5, Hz.D5, Hz.E5, Hz.G5, Hz.E5, Hz.C5, Hz.B4,
             // sec 4 (tension)
-            Hz.B5,  Hz.A5,  Hz.Fs5, Hz.E5,  Hz.Fs5, Hz.Ab5, Hz.B5,  Hz.Fs5,
-            Hz.E5,  Hz.Fs5, Hz.B5,  Hz.A5,  Hz.Ab5, Hz.Fs5, Hz.E5,  Hz.Eb5,
+            Hz.B5, Hz.A5, Hz.Fs5, Hz.E5, Hz.Fs5, Hz.Ab5, Hz.B5, Hz.Fs5,
+            Hz.E5, Hz.Fs5, Hz.B5, Hz.A5, Hz.Ab5, Hz.Fs5, Hz.E5, Hz.Eb5,
             // sec 5 (Em resolution)
-            Hz.E5,  Hz.B4,  Hz.G4,  Hz.E4,  Hz.G4,  Hz.B4,  Hz.E5,  Hz.D5,
-            Hz.B4,  Hz.G4,  Hz.E4,  Hz.G4,  Hz.B4,  Hz.E5,  Hz.G5,  Hz.E5,
+            Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.D5,
+            Hz.B4, Hz.G4, Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.G5, Hz.E5,
         ];
         // ── END EDITABLE PARAMETERS ───────────────────────────────────
 
-        const beatLen        = 60 / BPM;
+        const beatLen = 60 / BPM;
         const beatsPerSection = SECTION_LEN / beatLen;
-        const sixteenthLen   = beatLen / 4;
+        const sixteenthLen = beatLen / 4;
 
         // Master — boosted headroom
         const master = ctx.createGain();
@@ -340,9 +340,9 @@ class Music {
         padFilter.connect(master);
 
         for (let sec = 0; sec < 6; sec++) {
-            const t0    = sec * SECTION_LEN;
+            const t0 = sec * SECTION_LEN;
             const chord = PAD_CHORDS[sec];
-            const vol   = PAD_VOLUMES[sec] / chord.length;
+            const vol = PAD_VOLUMES[sec] / chord.length;
             for (const f of chord) {
                 for (const dt of [-PAD_DETUNE_CT, 0, PAD_DETUNE_CT]) {
                     const osc = ctx.createOscillator();
@@ -386,10 +386,10 @@ class Music {
         subOsc.stop(dur);
 
         for (let sec = 0; sec < 6; sec++) {
-            const t0      = sec * SECTION_LEN;
+            const t0 = sec * SECTION_LEN;
             const pattern = BASS_PATTERNS[sec];
             for (let beat = 0; beat < beatsPerSection; beat++) {
-                const t    = t0 + beat * beatLen;
+                const t = t0 + beat * beatLen;
                 const note = pattern[beat % pattern.length];
                 bassOsc.frequency.setValueAtTime(note, t);
                 subOsc.frequency.setValueAtTime(note / 2, t);
@@ -495,7 +495,7 @@ class Music {
         for (let sec = 1; sec < 6; sec++) {
             const vol = ARP_VOLUMES[sec];
             if (vol === 0) continue;
-            const t0      = sec * SECTION_LEN;
+            const t0 = sec * SECTION_LEN;
             const pattern = ARP_PATTERNS[sec];
             const stepCount = Math.floor(SECTION_LEN / sixteenthLen);
             for (let i = 0; i < stepCount; i++) {
@@ -528,7 +528,7 @@ class Music {
             const t0 = sec * SECTION_LEN;
             const notesThisSection = Math.floor(beatsPerSection);
             for (let i = 0; i < notesThisSection; i++) {
-                const t    = t0 + i * beatLen;
+                const t = t0 + i * beatLen;
                 const note = LEAD_NOTES[leadNoteIdx % LEAD_NOTES.length];
                 leadOsc.frequency.setValueAtTime(note, t);
                 leadGain.gain.setValueAtTime(0, t);
