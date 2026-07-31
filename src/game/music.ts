@@ -216,14 +216,31 @@ class Music {
 
     // ────────────────────────────────────────────────────────────────
     //  LEVEL TRACK  —  "Timeline"
-    //  Exactly 60 s, built in 6 sections of 10 s each.
+    //  Exactly 60 s (the seek math in seekLevel() assumes this).
     //
-    //  0-10 s   Groove established: bass + kick + detuned pad from bar 1
-    //  10-20 s  Arpeggio joins, hi-hat on off-beats
-    //  20-30 s  Lead melody enters (filtered square)
-    //  30-40 s  Chord change, more dissonance, snare added
-    //  40-50 s  Full climax — all layers at peak
-    //  50-60 s  Tension peak, then strip back to pad + bass for resolution
+    //  This is deliberately NOT a separate composition. It reuses the
+    //  menu track's exact chord (PAD_NOTES), bass line (BASS_PATTERN),
+    //  and both arp phrases verbatim — same key, same tempo, same
+    //  voices — so it reads as "the same song" rather than a different
+    //  piece of music.
+    //
+    //  What changes is arrangement, split into six 10 s segments so a
+    //  long, looping gameplay track has real variety instead of the
+    //  menu's short 4 s loop repeating fifteen times in a row:
+    //
+    //   0-10 s   Groove only — pad + bass, no arp (mirrors the menu's
+    //            own opening bars before the arp comes in)
+    //  10-20 s   Phrase A, at the menu's own octave
+    //  20-30 s   Phrase B, shifted up an octave, half-time — a
+    //            deliberately different contour so it doesn't feel
+    //            like a repeat of the last segment
+    //  30-40 s   The menu's full 16-note theme (A + B back to back),
+    //            quoted directly
+    //  40-50 s   Climax — phrase A doubled in octaves as a fast
+    //            call-and-response, full percussion
+    //  50-60 s   Phrase B alone, slowed down, percussion stripped back
+    //            — winds back to the intro feel so the loop point
+    //            doesn't jar
     // ────────────────────────────────────────────────────────────────
     private async renderLevel(): Promise<AudioBuffer> {
         const sr = 44100;
@@ -232,168 +249,151 @@ class Music {
         const ctx = new OfflineAudioContext(2, len, sr);
 
         // ── EDITABLE PARAMETERS ───────────────────────────────────────
-        const BPM = 128;
+        const BPM = 240; // same tempo as the menu track
         const SECTION_LEN = 10;
+        const stepLen = 60 / BPM; // same step length the menu arp uses
+        const beatLen = stepLen; // "beat" here = one menu-arp step
 
-        const PAD_DETUNE_CT = 8;
-        const PAD_CHORDS: number[][] = [
-            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
-            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
-            [Hz.D2, Hz.A2, Hz.Fs3, Hz.A3],
-            [Hz.C2, Hz.G2, Hz.E3, Hz.G3],
-            [Hz.E2, Hz.Fs2, Hz.B2, Hz.Eb3],
-            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
-        ];
-        const PAD_VOLUMES = [0.22, 0.22, 0.24, 0.26, 0.30, 0.20];
-        const PAD_FILTER_FREQS = [600, 800, 1000, 1200, 1600, 700];
+        const PAD_NOTES = [Hz.C3, Hz.G3, Hz.Bb3, Hz.Eb4]; // identical chord to the menu pad
+        const PAD_WAVE: OscillatorType = 'sawtooth';
+        const PAD_DETUNE_CT = 6;
+        const PAD_VOLUME = 0.16;
+        const PAD_FILTER_FREQS = [700, 900, 1100, 1300, 1800, 800]; // brightness arc across segments
 
-        const BASS_PATTERNS: number[][] = [
-            [Hz.E2, Hz.E2, Hz.G2, Hz.B2],
-            [Hz.E2, Hz.E2, Hz.G2, Hz.B2],
-            [Hz.D2, Hz.D2, Hz.A2, Hz.Fs2],
-            [Hz.C2, Hz.C2, Hz.G2, Hz.E2],
-            [Hz.E2, Hz.Fs2, Hz.G2, Hz.Fs2],
-            [Hz.E2, Hz.E2, Hz.B2, Hz.E2],
-        ];
-        const BASS_VOLUME = 0.55;
+        const BASS_PATTERN = [Hz.C2, Hz.G2, Hz.Bb2, Hz.G2]; // identical to the menu bass line
+        const BASS_VOLUME = 0.5;
         const BASS_DECAY = 0.40;
 
-        const ARP_PATTERNS: number[][] = [
-            [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
-            [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
-            [Hz.D4, Hz.Fs4, Hz.A4, Hz.D5, Hz.A4, Hz.Fs4, Hz.D4, Hz.Fs4],
-            [Hz.C4, Hz.E4, Hz.G4, Hz.C5, Hz.G4, Hz.E4, Hz.C4, Hz.E4],
-            [Hz.E4, Hz.Fs4, Hz.B4, Hz.E5, Hz.B4, Hz.Fs4, Hz.E4, Hz.Fs4],
-            [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
-        ];
-        const ARP_VOLUMES = [0, 0.18, 0.20, 0.22, 0.25, 0.16];
+        const ARP_PHRASE_A = [Hz.C4, Hz.Eb4, Hz.G4, Hz.Bb4, Hz.C5, Hz.Bb4, Hz.G4, Hz.Eb4];
+        const ARP_PHRASE_B = [Hz.G4, Hz.Bb4, Hz.Eb5, Hz.D5, Hz.C5, Hz.G4, Hz.Eb4, Hz.C4];
+        const ARP_PHRASE_A_LOW = ARP_PHRASE_A.map((f) => f / 2);   // octave down — mellow variant
+        const ARP_PHRASE_B_HIGH = ARP_PHRASE_B.map((f) => f * 2);  // octave up — bright variant
+        const ARP_THEME = [...ARP_PHRASE_A, ...ARP_PHRASE_B];      // the menu's full theme, verbatim
+        // Call-and-response: phrase A answered an octave down, note by note.
+        const ARP_CLIMAX = ARP_PHRASE_A.flatMap((f, i) => [f, ARP_PHRASE_A_LOW[i]]);
+        const ARP_VOLUME = 0.6;
 
-        const KICK_VOLUME = 0.55;
-        const KICK_FREQ_START = 120;
-        const KICK_FREQ_END = 35;
+        interface Segment {
+            arp: number[] | null;
+            arpStepLen: number;
+            bassEvery: number; // play the bass pattern every Nth beat
+            kick: boolean;
+            snare: boolean;
+            hat: boolean;
+            volume: number; // section intensity multiplier
+        }
 
-        const SNARE_VOLUMES = [0, 0, 0, 0.18, 0.22, 0.18];
-
-        const HAT_VOLUMES = [0, 0.06, 0.07, 0.08, 0.10, 0.07];
-        const HAT_CUTOFF = 7000;
-
-        const LEAD_VOLUMES = [0, 0, 0.18, 0.22, 0.28, 0.20];
-        const LEAD_FILTER_FREQ = 1800;
-        const LEAD_NOTES: number[] = [
-            Hz.Fs5, Hz.E5, Hz.D5, Hz.A4, Hz.D5, Hz.Fs5, Hz.A5, Hz.Fs5,
-            Hz.G5, Hz.Fs5, Hz.E5, Hz.D5, Hz.E5, Hz.D5, Hz.Cs5, Hz.D5,
-            Hz.E5, Hz.G5, Hz.C5, Hz.E5, Hz.G5, Hz.E5, Hz.D5, Hz.C5,
-            Hz.B4, Hz.C5, Hz.D5, Hz.E5, Hz.G5, Hz.E5, Hz.C5, Hz.B4,
-            Hz.B5, Hz.A5, Hz.Fs5, Hz.E5, Hz.Fs5, Hz.Ab5, Hz.B5, Hz.Fs5,
-            Hz.E5, Hz.Fs5, Hz.B5, Hz.A5, Hz.Ab5, Hz.Fs5, Hz.E5, Hz.Eb5,
-            Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.D5,
-            Hz.B4, Hz.G4, Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.G5, Hz.E5,
+        const SEGMENTS: Segment[] = [
+            { arp: null, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: false, hat: false, volume: 0.75 },
+            { arp: ARP_PHRASE_A, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: false, hat: true, volume: 0.9 },
+            { arp: ARP_PHRASE_B_HIGH, arpStepLen: stepLen * 2, bassEvery: 2, kick: true, snare: true, hat: true, volume: 0.95 },
+            { arp: ARP_THEME, arpStepLen: stepLen, bassEvery: 1, kick: true, snare: true, hat: true, volume: 1.0 },
+            { arp: ARP_CLIMAX, arpStepLen: stepLen / 2, bassEvery: 1, kick: true, snare: true, hat: true, volume: 1.15 },
+            { arp: ARP_PHRASE_B, arpStepLen: stepLen * 1.5, bassEvery: 1, kick: true, snare: false, hat: false, volume: 0.75 },
         ];
         // ── END EDITABLE PARAMETERS ───────────────────────────────────
 
-        const beatLen = 60 / BPM;
-        const beatsPerSection = SECTION_LEN / beatLen;
-        const sixteenthLen = beatLen / 4;
-
         const master = ctx.createGain();
-        master.gain.setValueAtTime(0.005, 0);
+        master.gain.setValueAtTime(0.5, 0);
         master.connect(ctx.destination);
 
+        // Pad — identical detuned-sawtooth chord to the menu track; only
+        // the filter brightness sweeps to track the segment arc.
+        const padGain = ctx.createGain();
+        padGain.gain.setValueAtTime(PAD_VOLUME, 0);
         const padFilter = ctx.createBiquadFilter();
         padFilter.type = 'lowpass';
-        padFilter.Q.setValueAtTime(0.7, 0);
+        padFilter.Q.setValueAtTime(0.6, 0);
         padFilter.frequency.setValueAtTime(PAD_FILTER_FREQS[0], 0);
         for (let sec = 0; sec < 6; sec++) {
-            padFilter.frequency.linearRampToValueAtTime(
-                PAD_FILTER_FREQS[sec], sec * SECTION_LEN + 0.1
-            );
+            padFilter.frequency.linearRampToValueAtTime(PAD_FILTER_FREQS[sec], sec * SECTION_LEN + 0.1);
         }
-        padFilter.connect(master);
+        padGain.connect(padFilter).connect(master);
 
-        for (let sec = 0; sec < 6; sec++) {
-            const t0 = sec * SECTION_LEN;
-            const chord = PAD_CHORDS[sec];
-            const vol = PAD_VOLUMES[sec] / chord.length;
-            for (const f of chord) {
-                for (const dt of [-PAD_DETUNE_CT, 0, PAD_DETUNE_CT]) {
-                    const osc = ctx.createOscillator();
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(f, 0);
-                    osc.detune.setValueAtTime(dt, 0);
-                    const v = ctx.createGain();
-                    v.gain.setValueAtTime(0, Math.max(0, t0 - 0.05));
-                    v.gain.linearRampToValueAtTime(vol, t0 + 0.3);
-                    v.gain.setValueAtTime(vol, t0 + SECTION_LEN - 0.3);
-                    v.gain.linearRampToValueAtTime(0, t0 + SECTION_LEN);
-                    osc.connect(v).connect(padFilter);
-                    osc.start(0);
-                    osc.stop(dur);
-                }
+        for (const f of PAD_NOTES) {
+            for (const dt of [-PAD_DETUNE_CT, PAD_DETUNE_CT]) {
+                const osc = ctx.createOscillator();
+                osc.type = PAD_WAVE;
+                osc.frequency.setValueAtTime(f, 0);
+                osc.detune.setValueAtTime(dt, 0);
+                const v = ctx.createGain();
+                v.gain.setValueAtTime(0.06, 0);
+                osc.connect(v).connect(padGain);
+                osc.start(0);
+                osc.stop(dur);
             }
         }
 
-        const bassFilter = ctx.createBiquadFilter();
-        bassFilter.type = 'lowpass';
-        bassFilter.frequency.setValueAtTime(400, 0);
-        bassFilter.Q.setValueAtTime(1.2, 0);
-
+        // Bass — identical pattern and voice to the menu; only the
+        // density (bassEvery) changes per segment.
         const bassGain = ctx.createGain();
         bassGain.gain.setValueAtTime(0, 0);
         const bassOsc = ctx.createOscillator();
-        bassOsc.type = 'sawtooth';
-        bassOsc.frequency.setValueAtTime(Hz.E2, 0);
-        bassOsc.connect(bassFilter).connect(bassGain).connect(master);
+        bassOsc.type = 'sine';
+        bassOsc.frequency.setValueAtTime(BASS_PATTERN[0], 0);
+        bassOsc.connect(bassGain).connect(master);
         bassOsc.start(0);
         bassOsc.stop(dur);
 
-        const subGain = ctx.createGain();
-        subGain.gain.setValueAtTime(0, 0);
-        const subOsc = ctx.createOscillator();
-        subOsc.type = 'sine';
-        subOsc.frequency.setValueAtTime(Hz.E2 / 2, 0);
-        subOsc.connect(subGain).connect(master);
-        subOsc.start(0);
-        subOsc.stop(dur);
-
         for (let sec = 0; sec < 6; sec++) {
+            const seg = SEGMENTS[sec];
             const t0 = sec * SECTION_LEN;
-            const pattern = BASS_PATTERNS[sec];
-            for (let beat = 0; beat < beatsPerSection; beat++) {
-                const t = t0 + beat * beatLen;
-                const note = pattern[beat % pattern.length];
+            const beatsPerSection = Math.floor(SECTION_LEN / beatLen);
+            for (let b = 0; b < beatsPerSection; b += seg.bassEvery) {
+                const t = t0 + b * beatLen;
+                const note = BASS_PATTERN[b % BASS_PATTERN.length];
+                const vel = (b % 4 === 0 ? BASS_VOLUME : BASS_VOLUME * 0.5) * seg.volume;
                 bassOsc.frequency.setValueAtTime(note, t);
-                subOsc.frequency.setValueAtTime(note / 2, t);
                 bassGain.gain.setValueAtTime(0, t);
-                bassGain.gain.linearRampToValueAtTime(BASS_VOLUME * 0.6, t + 0.006);
+                bassGain.gain.linearRampToValueAtTime(vel, t + 0.008);
                 bassGain.gain.linearRampToValueAtTime(0, t + beatLen * BASS_DECAY);
-                subGain.gain.setValueAtTime(0, t);
-                subGain.gain.linearRampToValueAtTime(BASS_VOLUME * 0.5, t + 0.010);
-                subGain.gain.linearRampToValueAtTime(0, t + beatLen * BASS_DECAY * 1.2);
             }
         }
 
+        // Arp — same triangle voice as the menu. Which phrase plays, at
+        // what octave, and at what step length is entirely down to
+        // SEGMENTS above.
+        const arpGain = ctx.createGain();
+        arpGain.gain.setValueAtTime(0, 0);
+        const arpOsc = ctx.createOscillator();
+        arpOsc.type = 'triangle';
+        arpOsc.frequency.setValueAtTime(Hz.C4, 0);
+        arpOsc.connect(arpGain).connect(master);
+        arpOsc.start(0);
+        arpOsc.stop(dur);
+
+        for (let sec = 0; sec < 6; sec++) {
+            const seg = SEGMENTS[sec];
+            if (!seg.arp) continue;
+            const t0 = sec * SECTION_LEN;
+            const steps = Math.floor(SECTION_LEN / seg.arpStepLen);
+            for (let i = 0; i < steps; i++) {
+                const t = t0 + i * seg.arpStepLen;
+                const note = seg.arp[i % seg.arp.length];
+                arpOsc.frequency.setValueAtTime(note, t);
+                const vel = ARP_VOLUME * 0.36 * seg.volume;
+                arpGain.gain.setValueAtTime(0, t);
+                arpGain.gain.linearRampToValueAtTime(vel, t + 0.004);
+                arpGain.gain.linearRampToValueAtTime(0, t + seg.arpStepLen * 0.65);
+            }
+        }
+
+        // Percussion — the one genuinely new element, since the menu
+        // track has no beat of its own; on/off per segment for contrast.
         const kickGain = ctx.createGain();
         kickGain.gain.setValueAtTime(0, 0);
         const kickOsc = ctx.createOscillator();
         kickOsc.type = 'sine';
-        kickOsc.frequency.setValueAtTime(KICK_FREQ_START, 0);
+        kickOsc.frequency.setValueAtTime(120, 0);
         kickOsc.connect(kickGain).connect(master);
         kickOsc.start(0);
         kickOsc.stop(dur);
 
-        for (let beat = 0; beat < Math.floor(dur / beatLen); beat++) {
-            if (beat % 4 !== 0 && beat % 4 !== 2) continue;
-            const t = beat * beatLen;
-            kickOsc.frequency.setValueAtTime(KICK_FREQ_START, t);
-            kickOsc.frequency.exponentialRampToValueAtTime(KICK_FREQ_END, t + 0.07);
-            kickGain.gain.setValueAtTime(0, t);
-            kickGain.gain.linearRampToValueAtTime(KICK_VOLUME, t + 0.004);
-            kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-        }
-
         const snareNoiseBuf = ctx.createBuffer(1, sr * dur, sr);
-        const snd = snareNoiseBuf.getChannelData(0);
-        for (let i = 0; i < snd.length; i++) snd[i] = Math.random() * 2 - 1;
+        {
+            const snd = snareNoiseBuf.getChannelData(0);
+            for (let i = 0; i < snd.length; i++) snd[i] = Math.random() * 2 - 1;
+        }
         const snareSrc = ctx.createBufferSource();
         snareSrc.buffer = snareNoiseBuf;
         const snareFilter = ctx.createBiquadFilter();
@@ -405,102 +405,56 @@ class Music {
         snareSrc.connect(snareFilter).connect(snareGain).connect(master);
         snareSrc.start(0);
 
-        for (let sec = 3; sec < 6; sec++) {
-            const vol = SNARE_VOLUMES[sec];
-            if (vol === 0) continue;
-            const t0 = sec * SECTION_LEN;
-            for (let beat = 0; beat < beatsPerSection; beat++) {
-                if (beat % 4 !== 1 && beat % 4 !== 3) continue;
-                const t = t0 + beat * beatLen;
-                snareGain.gain.setValueAtTime(0, t);
-                snareGain.gain.linearRampToValueAtTime(vol, t + 0.002);
-                snareGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-            }
-        }
-
         const hatNoiseBuf = ctx.createBuffer(1, sr * dur, sr);
-        const hnd = hatNoiseBuf.getChannelData(0);
-        for (let i = 0; i < hnd.length; i++) hnd[i] = Math.random() * 2 - 1;
+        {
+            const hnd = hatNoiseBuf.getChannelData(0);
+            for (let i = 0; i < hnd.length; i++) hnd[i] = Math.random() * 2 - 1;
+        }
         const hatSrc = ctx.createBufferSource();
         hatSrc.buffer = hatNoiseBuf;
         const hatFilter = ctx.createBiquadFilter();
         hatFilter.type = 'highpass';
-        hatFilter.frequency.setValueAtTime(HAT_CUTOFF, 0);
+        hatFilter.frequency.setValueAtTime(7000, 0);
         hatFilter.Q.setValueAtTime(0.5, 0);
         const hatGain = ctx.createGain();
         hatGain.gain.setValueAtTime(0, 0);
         hatSrc.connect(hatFilter).connect(hatGain).connect(master);
         hatSrc.start(0);
 
-        for (let sec = 1; sec < 6; sec++) {
-            const vol = HAT_VOLUMES[sec];
-            if (vol === 0) continue;
+        for (let sec = 0; sec < 6; sec++) {
+            const seg = SEGMENTS[sec];
             const t0 = sec * SECTION_LEN;
-            const stepsPerSection = Math.floor(SECTION_LEN / (beatLen / 2));
-            for (let i = 0; i < stepsPerSection; i++) {
-                if (i % 2 === 0) continue;
-                const t = t0 + i * (beatLen / 2);
-                hatGain.gain.setValueAtTime(0, t);
-                hatGain.gain.linearRampToValueAtTime(vol, t + 0.001);
-                hatGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+            const beatsPerSection = Math.floor(SECTION_LEN / beatLen);
+
+            if (seg.kick) {
+                for (let b = 0; b < beatsPerSection; b++) {
+                    if (b % 4 !== 0 && b % 4 !== 2) continue;
+                    const t = t0 + b * beatLen;
+                    kickOsc.frequency.setValueAtTime(120, t);
+                    kickOsc.frequency.exponentialRampToValueAtTime(35, t + 0.07);
+                    kickGain.gain.setValueAtTime(0, t);
+                    kickGain.gain.linearRampToValueAtTime(0.5 * seg.volume, t + 0.004);
+                    kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                }
             }
-        }
-
-        const arpGain = ctx.createGain();
-        arpGain.gain.setValueAtTime(0, 0);
-        const arpOsc = ctx.createOscillator();
-        arpOsc.type = 'triangle';
-        arpOsc.frequency.setValueAtTime(Hz.E4, 0);
-        const arpFilter = ctx.createBiquadFilter();
-        arpFilter.type = 'lowpass';
-        arpFilter.frequency.setValueAtTime(3000, 0);
-        arpOsc.connect(arpFilter).connect(arpGain).connect(master);
-        arpOsc.start(0);
-        arpOsc.stop(dur);
-
-        for (let sec = 1; sec < 6; sec++) {
-            const vol = ARP_VOLUMES[sec];
-            if (vol === 0) continue;
-            const t0 = sec * SECTION_LEN;
-            const pattern = ARP_PATTERNS[sec];
-            const stepCount = Math.floor(SECTION_LEN / sixteenthLen);
-            for (let i = 0; i < stepCount; i++) {
-                const t = t0 + i * sixteenthLen;
-                arpOsc.frequency.setValueAtTime(pattern[i % pattern.length], t);
-                arpGain.gain.setValueAtTime(0, t);
-                arpGain.gain.linearRampToValueAtTime(vol, t + 0.003);
-                arpGain.gain.linearRampToValueAtTime(0, t + sixteenthLen * 0.55);
+            if (seg.snare) {
+                for (let b = 0; b < beatsPerSection; b++) {
+                    if (b % 4 !== 1 && b % 4 !== 3) continue;
+                    const t = t0 + b * beatLen;
+                    snareGain.gain.setValueAtTime(0, t);
+                    snareGain.gain.linearRampToValueAtTime(0.18 * seg.volume, t + 0.002);
+                    snareGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                }
             }
-        }
-
-        const leadGain = ctx.createGain();
-        leadGain.gain.setValueAtTime(0, 0);
-        const leadOsc = ctx.createOscillator();
-        leadOsc.type = 'square';
-        leadOsc.frequency.setValueAtTime(Hz.E5, 0);
-        const leadFilter = ctx.createBiquadFilter();
-        leadFilter.type = 'lowpass';
-        leadFilter.frequency.setValueAtTime(LEAD_FILTER_FREQ, 0);
-        leadFilter.Q.setValueAtTime(1.0, 0);
-        leadOsc.connect(leadFilter).connect(leadGain).connect(master);
-        leadOsc.start(0);
-        leadOsc.stop(dur);
-
-        let leadNoteIdx = 0;
-        for (let sec = 2; sec < 6; sec++) {
-            const vol = LEAD_VOLUMES[sec];
-            if (vol === 0) { leadNoteIdx += Math.floor(beatsPerSection); continue; }
-            const t0 = sec * SECTION_LEN;
-            const notesThisSection = Math.floor(beatsPerSection);
-            for (let i = 0; i < notesThisSection; i++) {
-                const t = t0 + i * beatLen;
-                const note = LEAD_NOTES[leadNoteIdx % LEAD_NOTES.length];
-                leadOsc.frequency.setValueAtTime(note, t);
-                leadGain.gain.setValueAtTime(0, t);
-                leadGain.gain.linearRampToValueAtTime(vol, t + 0.006);
-                leadGain.gain.linearRampToValueAtTime(vol * 0.6, t + beatLen * 0.6);
-                leadGain.gain.linearRampToValueAtTime(0, t + beatLen - 0.03);
-                leadNoteIdx++;
+            if (seg.hat) {
+                const stepsPerSection = Math.floor(SECTION_LEN / (beatLen / 2));
+                for (let i = 0; i < stepsPerSection; i++) {
+                    if (i % 2 === 0) continue;
+                    const t = t0 + i * (beatLen / 2);
+                    hatGain.gain.setValueAtTime(0, t);
+                    hatGain.gain.linearRampToValueAtTime(0.07 * seg.volume, t + 0.001);
+                    hatGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+                }
             }
         }
 
