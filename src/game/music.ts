@@ -296,7 +296,7 @@ class Music {
         const sixteenthLen = beatLen / 4;
 
         const master = ctx.createGain();
-        master.gain.setValueAtTime(0.18, 0);
+        master.gain.setValueAtTime(0.005, 0);
         master.connect(ctx.destination);
 
         const padFilter = ctx.createBiquadFilter();
