@@ -234,212 +234,260 @@ class Music {
     //  LEVEL TRACK  —  "Timeline"
     //  Exactly 60 s, built in 6 sections of 10 s each.
     //
-    //  0-10 s   Ambient pad (E minor)
-    //  10-20 s  Bass enters
-    //  20-30 s  Arpeggio + kick drum
-    //  30-40 s  Hi-hat + lead melody
-    //  40-50 s  Full climax
-    //  50-60 s  Peak tension, then release
+    //  0-10 s   Groove established: bass + kick + detuned pad from bar 1
+    //  10-20 s  Arpeggio joins, hi-hat on off-beats
+    //  20-30 s  Lead melody enters (filtered square)
+    //  30-40 s  Chord change, more dissonance, snare added
+    //  40-50 s  Full climax — all layers at peak
+    //  50-60 s  Tension peak, then strip back to pad + bass for resolution
     // ────────────────────────────────────────────────────────────────
     private async renderLevel(): Promise<AudioBuffer> {
         const sr = 44100;
-        const dur = 60; // seconds (exactly one timeline)
+        const dur = 60;
         const len = sr * dur;
         const ctx = new OfflineAudioContext(2, len, sr);
 
         // ── EDITABLE PARAMETERS ───────────────────────────────────────
-        const BPM = 120;
-        const SECTION_LEN = 10; // seconds per section
+        const BPM = 128;
+        const SECTION_LEN = 10;
 
-        // Pad: warm sawtooth, slow filter sweep
-        const PAD_WAVE: OscillatorType = 'sawtooth';
-        const PAD_VOLUMES = [0.04, 0.05, 0.06, 0.07, 0.09, 0.08];
+        // Pad: detuned sawtooth supersaw (3 voices per note)
+        const PAD_DETUNE_CT = 8;
         const PAD_NOTES_BY_SECTION: number[][] = [
-            [Hz.E3, Hz.G3, Hz.B3],                    // Em
-            [Hz.E3, Hz.G3, Hz.B3, Hz.D4],             // Em7
-            [Hz.E3, Hz.G3, Hz.B3, Hz.D4, Hz.Fs4],     // Em9
-            [Hz.E3, Hz.G3, Hz.B3, Hz.D4],             // Em7
-            [Hz.E3, Hz.G3, Hz.B3, Hz.D4, Hz.Fs4],     // Em9
-            [Hz.E3, Hz.G3, Hz.B3, Hz.D4],             // Em7
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],             // Em
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],             // Em (arp joins)
+            [Hz.D2, Hz.A2, Hz.Fs3, Hz.A3],            // D
+            [Hz.C2, Hz.G2, Hz.E3, Hz.G3],             // C
+            [Hz.B1: undefined as never ?? Hz.E2, Hz.Fs2, Hz.B2, Hz.Ds3 ?? Hz.Eb3],  // B (tension)
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],             // Em (resolution)
         ];
-        const PAD_FILTER_START = 400;
-        const PAD_FILTER_MID = 1200;
-        const PAD_FILTER_PEAK = 1800;
-        const PAD_FILTER_END = 700;
-        const PAD_FILTER_LFO_RATE = 0.15;
-        const PAD_FILTER_LFO_DEPTH = 200;
+        // Use cleaner chord voicings without undefined
+        const PAD_CHORDS: number[][] = [
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
+            [Hz.D2, Hz.A2, Hz.Fs3, Hz.A3],
+            [Hz.C2, Hz.G2, Hz.E3, Hz.G3],
+            [Hz.E2, Hz.Fs2, Hz.B2, Hz.Eb3],
+            [Hz.E2, Hz.B2, Hz.G3, Hz.B3],
+        ];
+        const PAD_VOLUMES = [0.22, 0.22, 0.24, 0.26, 0.30, 0.20];
+        const PAD_FILTER_FREQS = [600, 800, 1000, 1200, 1600, 700];
 
-        // Bass: sine, quarter notes
-        const BASS_WAVE: OscillatorType = 'sine';
-        const BASS_VOLUMES = [0, 0.08, 0.10, 0.12, 0.14, 0.12];
+        // Bass: saw + sub sine, punchy quarter notes from bar 1
         const BASS_PATTERNS: number[][] = [
-            [Hz.E2, Hz.B2, Hz.G2, Hz.A2],
-            [Hz.E2, Hz.B2, Hz.G2, Hz.A2],
-            [Hz.E2, Hz.B2, Hz.G2, Hz.A2],
-            [Hz.E2, Hz.B2, Hz.G2, Hz.A2],
-            [Hz.E2, Hz.B2, Hz.G2, Hz.A2],
-            [Hz.E2, Hz.E2, Hz.E2, Hz.E2],
+            [Hz.E2, Hz.E2, Hz.G2, Hz.B2],
+            [Hz.E2, Hz.E2, Hz.G2, Hz.B2],
+            [Hz.D2, Hz.D2, Hz.A2, Hz.Fs2],
+            [Hz.C2, Hz.C2, Hz.G2, Hz.E2],
+            [Hz.E2, Hz.Fs2, Hz.G2, Hz.Fs2],
+            [Hz.E2, Hz.E2, Hz.B2, Hz.E2],
         ];
-        const BASS_DECAY = 0.35;
+        const BASS_VOLUME = 0.55;
+        const BASS_DECAY = 0.40;
 
-        // Arpeggio: triangle, 8th notes, entering at section 3
-        const ARP_WAVE: OscillatorType = 'triangle';
-        const ARP_VOLUMES = [0, 0, 0.03, 0.04, 0.05, 0.04];
+        // Arpeggio: triangle, 16th notes, from section 2
         const ARP_PATTERNS: number[][] = [
             [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
-            [Hz.E4, Hz.G4, Hz.B4, Hz.D5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
-            [Hz.E4, Hz.G4, Hz.B4, Hz.D5, Hz.Fs5, Hz.D5, Hz.B4, Hz.G4],
-            [Hz.E4, Hz.G4, Hz.B4, Hz.D5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
-            [Hz.E4, Hz.G4, Hz.B4, Hz.D5, Hz.Fs5, Hz.G5, Hz.Fs5, Hz.D5],
+            [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
+            [Hz.D4, Hz.Fs4, Hz.A4, Hz.D5, Hz.A4, Hz.Fs4, Hz.D4, Hz.Fs4],
+            [Hz.C4, Hz.E4, Hz.G4, Hz.C5, Hz.G4, Hz.E4, Hz.C4, Hz.E4],
+            [Hz.E4, Hz.Fs4, Hz.B4, Hz.E5, Hz.B4, Hz.Fs4, Hz.E4, Hz.Fs4],
             [Hz.E4, Hz.G4, Hz.B4, Hz.E5, Hz.B4, Hz.G4, Hz.E4, Hz.G4],
         ];
+        const ARP_VOLUMES = [0, 0.18, 0.20, 0.22, 0.25, 0.16];
 
-        // Kick: sine blip, on half notes, entering at section 3
-        const KICK_VOLUMES = [0, 0, 0.06, 0.08, 0.10, 0.09];
-        const KICK_FREQ = 80;
+        // Kick: punchy sine blip, on beats 1 and 3 from section 1
+        const KICK_VOLUME = 0.55;
+        const KICK_FREQ_START = 120;
+        const KICK_FREQ_END = 35;
 
-        // Hi-hat: filtered noise, 8th notes, entering at section 4
-        const HAT_VOLUMES = [0, 0, 0, 0.02, 0.03, 0.025];
-        const HAT_CUTOFF = 8000;
+        // Snare: noise burst, on beats 2 and 4, from section 4
+        const SNARE_VOLUMES = [0, 0, 0, 0.18, 0.22, 0.18];
 
-        // Lead melody: square wave + low-pass, entering at section 4
-        const LEAD_WAVE: OscillatorType = 'square';
-        const LEAD_VOLUMES = [0, 0, 0, 0.035, 0.05, 0.045];
-        const LEAD_FILTER = 1200;
-        const LEAD_MELODY = [
-            Hz.E5, Hz.G5, Hz.B5, Hz.G5, Hz.E5, Hz.D5, Hz.C5, Hz.D5,
-            Hz.E5, Hz.G5, Hz.B5, Hz.D6, Hz.C6, Hz.B5, Hz.G5, Hz.E5,
-            Hz.E5, Hz.G5, Hz.B5, Hz.G5, Hz.E5, Hz.Fs5, Hz.G5, Hz.A5,
-            Hz.B5, Hz.G5, Hz.E5, Hz.D5, Hz.C5, Hz.D5, Hz.E5, Hz.C5,
+        // Hi-hat: filtered noise, 8th notes off-beats, from section 2
+        const HAT_VOLUMES = [0, 0.06, 0.07, 0.08, 0.10, 0.07];
+        const HAT_CUTOFF = 7000;
+
+        // Lead melody: filtered square wave, from section 3
+        // Plays quarter notes — one note per beat
+        const LEAD_VOLUMES = [0, 0, 0.18, 0.22, 0.28, 0.20];
+        const LEAD_FILTER_FREQ = 1800;
+        // 4 bars × 4 beats = 16 notes per section, 4 sections = 64 notes total
+        const LEAD_MELODY: number[] = [
+            // Sec 3 (D major feel)
+            Hz.Fs5, Hz.E5, Hz.D5, Hz.A4,  Hz.D5, Hz.Fs5, Hz.A5, Hz.Fs5,
+            Hz.G5,  Hz.Fs5,Hz.E5, Hz.D5,  Hz.E5, Hz.D5,  Hz.Cs5,Hz.D5,
+            // Sec 4 (C major)
+            Hz.E5,  Hz.G5, Hz.C5, Hz.E5,  Hz.G5, Hz.E5,  Hz.D5, Hz.C5,
+            Hz.B4,  Hz.C5, Hz.D5, Hz.E5,  Hz.G5, Hz.E5,  Hz.C5, Hz.B4,
+            // Sec 5 (tension / B)
+            Hz.B5,  Hz.A5, Hz.Fs5,Hz.E5,  Hz.Fs5,Hz.Gs5 ?? Hz.Ab5,Hz.B5,Hz.Fs5,
+            Hz.E5,  Hz.Fs5,Hz.B5, Hz.A5,  Hz.Gs5 ?? Hz.Ab5,Hz.Fs5,Hz.E5,Hz.Ds5 ?? Hz.Eb5,
+            // Sec 6 (resolution Em)
+            Hz.E5,  Hz.B4, Hz.G4, Hz.E4,  Hz.G4, Hz.B4,  Hz.E5, Hz.D5,
+            Hz.B4,  Hz.G4, Hz.E4, Hz.G4,  Hz.B4, Hz.E5,  Hz.G5, Hz.E5,
         ];
-        const LEAD_NOTE_LEN = 60 / BPM * 2; // half notes
+        // Clean lead melody without null-coalescing noise
+        const LEAD_NOTES: number[] = [
+            // Sec 3 (D)
+            Hz.Fs5, Hz.E5, Hz.D5, Hz.A4,  Hz.D5, Hz.Fs5, Hz.A5, Hz.Fs5,
+            Hz.G5,  Hz.Fs5,Hz.E5, Hz.D5,  Hz.E5, Hz.D5,  Hz.Cs5,Hz.D5,
+            // Sec 4 (C)
+            Hz.E5,  Hz.G5, Hz.C5, Hz.E5,  Hz.G5, Hz.E5,  Hz.D5, Hz.C5,
+            Hz.B4,  Hz.C5, Hz.D5, Hz.E5,  Hz.G5, Hz.E5,  Hz.C5, Hz.B4,
+            // Sec 5 (tension)
+            Hz.B5,  Hz.A5, Hz.Fs5,Hz.E5,  Hz.Fs5,Hz.Ab5, Hz.B5, Hz.Fs5,
+            Hz.E5,  Hz.Fs5,Hz.B5, Hz.A5,  Hz.Ab5,Hz.Fs5, Hz.E5, Hz.Eb5,
+            // Sec 6 (Em resolution)
+            Hz.E5,  Hz.B4, Hz.G4, Hz.E4,  Hz.G4, Hz.B4,  Hz.E5, Hz.D5,
+            Hz.B4,  Hz.G4, Hz.E4, Hz.G4,  Hz.B4, Hz.E5,  Hz.G5, Hz.E5,
+        ];
         // ── END EDITABLE PARAMETERS ───────────────────────────────────
 
         const beatLen = 60 / BPM;
-        const beatsPerSection = SECTION_LEN / beatLen; // 20
-        const arpStep = beatLen / 2;
+        const beatsPerSection = SECTION_LEN / beatLen;
+        const sixteenthLen = beatLen / 4;
 
-        // Master limiter
+        // Master — boosted headroom
         const master = ctx.createGain();
-        master.gain.setValueAtTime(0.45, 0);
+        master.gain.setValueAtTime(0.70, 0);
         master.connect(ctx.destination);
 
-        // ── Pad ───────────────────────────────────────────────────────
-        const padGain = ctx.createGain();
-        padGain.gain.setValueAtTime(0, 0);
+        // ── Detuned pad (supersaw-style) ──────────────────────────────
+        // Three detuned voices per chord note for thickness
         const padFilter = ctx.createBiquadFilter();
         padFilter.type = 'lowpass';
-        padFilter.Q.setValueAtTime(0.5, 0);
-        padFilter.frequency.setValueAtTime(PAD_FILTER_START, 0);
-        padFilter.frequency.linearRampToValueAtTime(PAD_FILTER_MID, 20);
-        padFilter.frequency.linearRampToValueAtTime(PAD_FILTER_PEAK, 40);
-        padFilter.frequency.linearRampToValueAtTime(PAD_FILTER_END, 60);
-        padGain.connect(padFilter).connect(master);
-
-        const padLfo = ctx.createOscillator();
-        padLfo.type = 'sine';
-        padLfo.frequency.setValueAtTime(PAD_FILTER_LFO_RATE, 0);
-        const padLfoGain = ctx.createGain();
-        padLfoGain.gain.setValueAtTime(PAD_FILTER_LFO_DEPTH, 0);
-        padLfo.connect(padLfoGain).connect(padFilter.frequency);
-        padLfo.start(0);
-        padLfo.stop(dur);
+        padFilter.Q.setValueAtTime(0.7, 0);
+        padFilter.frequency.setValueAtTime(PAD_FILTER_FREQS[0], 0);
+        for (let sec = 0; sec < 6; sec++) {
+            padFilter.frequency.linearRampToValueAtTime(
+                PAD_FILTER_FREQS[sec], sec * SECTION_LEN + 0.1
+            );
+        }
+        padFilter.connect(master);
 
         for (let sec = 0; sec < 6; sec++) {
             const t0 = sec * SECTION_LEN;
-            const vol = PAD_VOLUMES[sec];
-            for (const f of PAD_NOTES_BY_SECTION[sec]) {
-                const osc = ctx.createOscillator();
-                osc.type = PAD_WAVE;
-                osc.frequency.setValueAtTime(f, 0);
-                const v = ctx.createGain();
-                v.gain.setValueAtTime(0, t0);
-                v.gain.setValueAtTime(vol, t0 + 0.05);
-                osc.connect(v).connect(padGain);
-                osc.start(0);
-                osc.stop(dur);
+            const chord = PAD_CHORDS[sec];
+            const vol = PAD_VOLUMES[sec] / chord.length;
+            for (const f of chord) {
+                for (const dt of [-PAD_DETUNE_CT, 0, PAD_DETUNE_CT]) {
+                    const osc = ctx.createOscillator();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(f, 0);
+                    osc.detune.setValueAtTime(dt, 0);
+                    const v = ctx.createGain();
+                    // Smooth crossfade between sections
+                    v.gain.setValueAtTime(0, Math.max(0, t0 - 0.05));
+                    v.gain.linearRampToValueAtTime(vol, t0 + 0.3);
+                    v.gain.setValueAtTime(vol, t0 + SECTION_LEN - 0.3);
+                    v.gain.linearRampToValueAtTime(0, t0 + SECTION_LEN);
+                    osc.connect(v).connect(padFilter);
+                    osc.start(0);
+                    osc.stop(dur);
+                }
             }
         }
 
-        // ── Bass ──────────────────────────────────────────────────────
+        // ── Bass (saw + sub) ──────────────────────────────────────────
+        // Sawtooth for grit
+        const bassFilter = ctx.createBiquadFilter();
+        bassFilter.type = 'lowpass';
+        bassFilter.frequency.setValueAtTime(400, 0);
+        bassFilter.Q.setValueAtTime(1.2, 0);
+
         const bassGain = ctx.createGain();
         bassGain.gain.setValueAtTime(0, 0);
         const bassOsc = ctx.createOscillator();
-        bassOsc.type = BASS_WAVE;
+        bassOsc.type = 'sawtooth';
         bassOsc.frequency.setValueAtTime(Hz.E2, 0);
-        bassOsc.connect(bassGain).connect(master);
+        bassOsc.connect(bassFilter).connect(bassGain).connect(master);
         bassOsc.start(0);
         bassOsc.stop(dur);
+
+        // Sub sine one octave below
+        const subGain = ctx.createGain();
+        subGain.gain.setValueAtTime(0, 0);
+        const subOsc = ctx.createOscillator();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(Hz.E2 / 2, 0);
+        subOsc.connect(subGain).connect(master);
+        subOsc.start(0);
+        subOsc.stop(dur);
 
         for (let sec = 0; sec < 6; sec++) {
             const t0 = sec * SECTION_LEN;
             const pattern = BASS_PATTERNS[sec];
-            const vol = BASS_VOLUMES[sec];
             for (let beat = 0; beat < beatsPerSection; beat++) {
                 const t = t0 + beat * beatLen;
-                bassOsc.frequency.setValueAtTime(pattern[beat % pattern.length], t);
+                const note = pattern[beat % pattern.length];
+                bassOsc.frequency.setValueAtTime(note, t);
+                subOsc.frequency.setValueAtTime(note / 2, t);
+                // Punchy envelope
                 bassGain.gain.setValueAtTime(0, t);
-                bassGain.gain.linearRampToValueAtTime(vol, t + 0.008);
+                bassGain.gain.linearRampToValueAtTime(BASS_VOLUME * 0.6, t + 0.006);
                 bassGain.gain.linearRampToValueAtTime(0, t + beatLen * BASS_DECAY);
-            }
-        }
-
-        // ── Arpeggio ──────────────────────────────────────────────────
-        const arpGain = ctx.createGain();
-        arpGain.gain.setValueAtTime(0, 0);
-        const arpOsc = ctx.createOscillator();
-        arpOsc.type = ARP_WAVE;
-        arpOsc.frequency.setValueAtTime(Hz.E4, 0);
-        arpOsc.connect(arpGain).connect(master);
-        arpOsc.start(0);
-        arpOsc.stop(dur);
-
-        for (let sec = 0; sec < 6; sec++) {
-            const t0 = sec * SECTION_LEN;
-            const pattern = ARP_PATTERNS[sec];
-            const vol = ARP_VOLUMES[sec];
-            if (vol === 0) continue;
-            const steps = SECTION_LEN / arpStep;
-            for (let i = 0; i < steps; i++) {
-                const t = t0 + i * arpStep;
-                arpOsc.frequency.setValueAtTime(pattern[i % pattern.length], t);
-                arpGain.gain.setValueAtTime(0, t);
-                arpGain.gain.linearRampToValueAtTime(vol, t + 0.004);
-                arpGain.gain.linearRampToValueAtTime(0, t + arpStep * 0.35);
+                subGain.gain.setValueAtTime(0, t);
+                subGain.gain.linearRampToValueAtTime(BASS_VOLUME * 0.5, t + 0.010);
+                subGain.gain.linearRampToValueAtTime(0, t + beatLen * BASS_DECAY * 1.2);
             }
         }
 
         // ── Kick ──────────────────────────────────────────────────────
+        // Beats 1 & 3 of every bar throughout
         const kickGain = ctx.createGain();
         kickGain.gain.setValueAtTime(0, 0);
         const kickOsc = ctx.createOscillator();
         kickOsc.type = 'sine';
-        kickOsc.frequency.setValueAtTime(KICK_FREQ, 0);
+        kickOsc.frequency.setValueAtTime(KICK_FREQ_START, 0);
         kickOsc.connect(kickGain).connect(master);
         kickOsc.start(0);
         kickOsc.stop(dur);
 
-        for (let sec = 0; sec < 6; sec++) {
-            const t0 = sec * SECTION_LEN;
-            const vol = KICK_VOLUMES[sec];
+        for (let beat = 0; beat < Math.floor(dur / beatLen); beat++) {
+            if (beat % 4 !== 0 && beat % 4 !== 2) continue; // beats 1 & 3
+            const t = beat * beatLen;
+            kickOsc.frequency.setValueAtTime(KICK_FREQ_START, t);
+            kickOsc.frequency.exponentialRampToValueAtTime(KICK_FREQ_END, t + 0.07);
+            kickGain.gain.setValueAtTime(0, t);
+            kickGain.gain.linearRampToValueAtTime(KICK_VOLUME, t + 0.004);
+            kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        }
+
+        // ── Snare (noise burst) ───────────────────────────────────────
+        const snareNoiseBuf = ctx.createBuffer(1, sr * dur, sr);
+        const snd = snareNoiseBuf.getChannelData(0);
+        for (let i = 0; i < snd.length; i++) snd[i] = Math.random() * 2 - 1;
+        const snareSrc = ctx.createBufferSource();
+        snareSrc.buffer = snareNoiseBuf;
+        const snareFilter = ctx.createBiquadFilter();
+        snareFilter.type = 'bandpass';
+        snareFilter.frequency.setValueAtTime(1800, 0);
+        snareFilter.Q.setValueAtTime(0.8, 0);
+        const snareGain = ctx.createGain();
+        snareGain.gain.setValueAtTime(0, 0);
+        snareSrc.connect(snareFilter).connect(snareGain).connect(master);
+        snareSrc.start(0);
+
+        for (let sec = 3; sec < 6; sec++) {
+            const vol = SNARE_VOLUMES[sec];
             if (vol === 0) continue;
-            for (let beat = 0; beat < beatsPerSection; beat += 2) {
+            const t0 = sec * SECTION_LEN;
+            for (let beat = 0; beat < beatsPerSection; beat++) {
+                if (beat % 4 !== 1 && beat % 4 !== 3) continue; // beats 2 & 4
                 const t = t0 + beat * beatLen;
-                kickOsc.frequency.setValueAtTime(KICK_FREQ, t);
-                kickOsc.frequency.exponentialRampToValueAtTime(30, t + 0.08);
-                kickGain.gain.setValueAtTime(0, t);
-                kickGain.gain.linearRampToValueAtTime(vol, t + 0.004);
-                kickGain.gain.linearRampToValueAtTime(0, t + 0.1);
+                snareGain.gain.setValueAtTime(0, t);
+                snareGain.gain.linearRampToValueAtTime(vol, t + 0.002);
+                snareGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
             }
         }
 
         // ── Hi-hat ────────────────────────────────────────────────────
-        const hatLen = sr * dur;
-        const hatBuf = ctx.createBuffer(1, hatLen, sr);
-        const hd = hatBuf.getChannelData(0);
-        for (let i = 0; i < hatLen; i++) hd[i] = Math.random() * 2 - 1;
+        const hatNoiseBuf = ctx.createBuffer(1, sr * dur, sr);
+        const hnd = hatNoiseBuf.getChannelData(0);
+        for (let i = 0; i < hnd.length; i++) hnd[i] = Math.random() * 2 - 1;
         const hatSrc = ctx.createBufferSource();
-        hatSrc.buffer = hatBuf;
+        hatSrc.buffer = hatNoiseBuf;
         const hatFilter = ctx.createBiquadFilter();
         hatFilter.type = 'highpass';
         hatFilter.frequency.setValueAtTime(HAT_CUTOFF, 0);
@@ -449,46 +497,77 @@ class Music {
         hatSrc.connect(hatFilter).connect(hatGain).connect(master);
         hatSrc.start(0);
 
-        for (let sec = 0; sec < 6; sec++) {
-            const t0 = sec * SECTION_LEN;
+        for (let sec = 1; sec < 6; sec++) {
             const vol = HAT_VOLUMES[sec];
             if (vol === 0) continue;
-            const steps = SECTION_LEN / arpStep;
-            for (let i = 0; i < steps; i++) {
+            const t0 = sec * SECTION_LEN;
+            const stepsPerSection = Math.floor(SECTION_LEN / (beatLen / 2));
+            for (let i = 0; i < stepsPerSection; i++) {
                 if (i % 2 === 0) continue; // off-beats only
-                const t = t0 + i * arpStep;
+                const t = t0 + i * (beatLen / 2);
                 hatGain.gain.setValueAtTime(0, t);
                 hatGain.gain.linearRampToValueAtTime(vol, t + 0.001);
-                hatGain.gain.linearRampToValueAtTime(0, t + 0.04);
+                hatGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
             }
         }
 
-        // ── Lead ──────────────────────────────────────────────────────
+        // ── Arpeggio ──────────────────────────────────────────────────
+        const arpGain = ctx.createGain();
+        arpGain.gain.setValueAtTime(0, 0);
+        const arpOsc = ctx.createOscillator();
+        arpOsc.type = 'triangle';
+        arpOsc.frequency.setValueAtTime(Hz.E4, 0);
+        const arpFilter = ctx.createBiquadFilter();
+        arpFilter.type = 'lowpass';
+        arpFilter.frequency.setValueAtTime(3000, 0);
+        arpOsc.connect(arpFilter).connect(arpGain).connect(master);
+        arpOsc.start(0);
+        arpOsc.stop(dur);
+
+        for (let sec = 1; sec < 6; sec++) {
+            const vol = ARP_VOLUMES[sec];
+            if (vol === 0) continue;
+            const t0 = sec * SECTION_LEN;
+            const pattern = ARP_PATTERNS[sec];
+            const stepCount = Math.floor(SECTION_LEN / sixteenthLen);
+            for (let i = 0; i < stepCount; i++) {
+                const t = t0 + i * sixteenthLen;
+                arpOsc.frequency.setValueAtTime(pattern[i % pattern.length], t);
+                arpGain.gain.setValueAtTime(0, t);
+                arpGain.gain.linearRampToValueAtTime(vol, t + 0.003);
+                arpGain.gain.linearRampToValueAtTime(0, t + sixteenthLen * 0.55);
+            }
+        }
+
+        // ── Lead melody ───────────────────────────────────────────────
         const leadGain = ctx.createGain();
         leadGain.gain.setValueAtTime(0, 0);
         const leadOsc = ctx.createOscillator();
-        leadOsc.type = LEAD_WAVE;
+        leadOsc.type = 'square';
         leadOsc.frequency.setValueAtTime(Hz.E5, 0);
         const leadFilter = ctx.createBiquadFilter();
         leadFilter.type = 'lowpass';
-        leadFilter.frequency.setValueAtTime(LEAD_FILTER, 0);
+        leadFilter.frequency.setValueAtTime(LEAD_FILTER_FREQ, 0);
+        leadFilter.Q.setValueAtTime(1.0, 0);
         leadOsc.connect(leadFilter).connect(leadGain).connect(master);
         leadOsc.start(0);
         leadOsc.stop(dur);
 
-        for (let sec = 0; sec < 6; sec++) {
-            const t0 = sec * SECTION_LEN;
+        let leadNoteIdx = 0;
+        for (let sec = 2; sec < 6; sec++) {
             const vol = LEAD_VOLUMES[sec];
-            if (vol === 0) continue;
-            const notes = SECTION_LEN / LEAD_NOTE_LEN;
-            for (let i = 0; i < notes; i++) {
-                const t = t0 + i * LEAD_NOTE_LEN;
-                const idx = (sec * 8 + i * 2) % LEAD_MELODY.length;
-                leadOsc.frequency.setValueAtTime(LEAD_MELODY[idx], t);
+            if (vol === 0) { leadNoteIdx += Math.floor(beatsPerSection); continue; }
+            const t0 = sec * SECTION_LEN;
+            const notesThisSection = Math.floor(beatsPerSection);
+            for (let i = 0; i < notesThisSection; i++) {
+                const t = t0 + i * beatLen;
+                const note = LEAD_NOTES[leadNoteIdx % LEAD_NOTES.length];
+                leadOsc.frequency.setValueAtTime(note, t);
                 leadGain.gain.setValueAtTime(0, t);
-                leadGain.gain.linearRampToValueAtTime(vol, t + 0.008);
-                leadGain.gain.linearRampToValueAtTime(vol * 0.5, t + LEAD_NOTE_LEN * 0.75);
-                leadGain.gain.linearRampToValueAtTime(0, t + LEAD_NOTE_LEN - 0.05);
+                leadGain.gain.linearRampToValueAtTime(vol, t + 0.006);
+                leadGain.gain.linearRampToValueAtTime(vol * 0.6, t + beatLen * 0.6);
+                leadGain.gain.linearRampToValueAtTime(0, t + beatLen - 0.03);
+                leadNoteIdx++;
             }
         }
 
