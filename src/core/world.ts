@@ -383,7 +383,8 @@ export class World {
     const target = clamp(this.now + this.dir, 0, TICKS);
     const beforeBoxes = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
 
-    if (this.dir === 1) this.stepBoxesForward(target);
+    let ghostHandled = new Set<number>();
+    if (this.dir === 1) ghostHandled = this.stepBoxesForward(target);
     else for (const box of this.boxes) box.state = { ...this.boxStateAt(box, target) };
 
     const beforePlayerBoxCarry = { x: this.player.x, y: this.player.y };
@@ -399,7 +400,10 @@ export class World {
     }
 
     const afterPlayerBoxCarry = { x: this.player.x, y: this.player.y };
-    this.carryBoxesBySupport(beforeBoxes, beforePlayerBoxCarry, afterPlayerBoxCarry);
+    // Anything a recorded body already moved this tick is left alone: `beforeBoxes`
+    // predates that motion, so carrying it again by its support's delta would count
+    // the shove twice — once per layer of the stack.
+    this.carryBoxesBySupport(beforeBoxes, beforePlayerBoxCarry, afterPlayerBoxCarry, ghostHandled);
 
     const beforeBoxesPlayerStep = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
     const beforePlayerStep = { x: this.player.x, y: this.player.y };
@@ -644,7 +648,8 @@ export class World {
     return carried;
   }
 
-  private stepBoxesForward(target: number): void {
+  /** Returns the boxes a recorded body already moved this tick. */
+  private stepBoxesForward(target: number): Set<number> {
     const all = this.boxes;
     const carried = this.applyGhostMotion(target);
     const ghosts = this.ghostSolidsAt(target);
@@ -704,6 +709,7 @@ export class World {
       box.record[target] = { ...box.state };
       box.recordedMax = Math.max(box.recordedMax, target);
     }
+    return new Set([...carried, ...this.ghostPushedIds]);
   }
 
   private stepPlayer(input: Input): void {
