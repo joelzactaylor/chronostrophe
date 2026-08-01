@@ -426,11 +426,21 @@ export class World {
    * This lets crates ride the live player, and it also keeps crates riding on top
    * of other crates or monoliths in sync with the support they sit on.
    */
-  private carryBoxesBySupport(beforeBoxes: Array<{ x: number; y: number }>, beforePlayer: { x: number; y: number }, afterPlayer: { x: number; y: number }): void {
+  private carryBoxesBySupport(beforeBoxes: Array<{ x: number; y: number }>, beforePlayer: { x: number; y: number }, afterPlayer: { x: number; y: number }, skipIds = new Set<number>()): Set<number> {
+    const moved = new Set<number>();
     const playerDx = afterPlayer.x - beforePlayer.x;
     const playerDy = afterPlayer.y - beforePlayer.y;
-    for (const box of this.boxes) {
-      if (box.immovable) continue;
+    const orderedBoxes = [...this.boxes].sort((b, a) => a.state.y - b.state.y || a.state.x - b.state.x);
+    const propagatedDeltas = new Map<number, { x: number; y: number }>();
+
+    for (const box of orderedBoxes) {
+      if (box.immovable || skipIds.has(box.id)) continue;
+      const before = beforeBoxes[box.id];
+      const rawDelta = before
+        ? { x: box.state.x - before.x, y: box.state.y - before.y }
+        : { x: 0, y: 0 };
+      propagatedDeltas.set(box.id, rawDelta);
+
       const probe: Rect = { x: box.state.x, y: box.state.y + box.h - 2, w: box.w, h: 4 };
       let supportDx = 0;
       let supportDy = 0;
@@ -445,18 +455,17 @@ export class World {
       }
 
       if (supportDx === 0 && supportDy === 0) {
-        for (const other of this.boxes) {
+        for (const other of orderedBoxes) {
           if (other === box) continue;
           const r = boxRect(other);
           const supportsBox = rectsOverlap(probe, r) && r.y >= box.state.y + box.h - 4 && r.y <= box.state.y + box.h + 4;
           if (!supportsBox) continue;
-          const before = beforeBoxes[other.id];
-          if (!before) continue;
-          const dx = other.state.x - before.x;
-          const dy = other.state.y - before.y;
-          if (dx !== 0 || dy !== 0) {
-            supportDx = dx;
-            supportDy = dy;
+          const beforeOther = beforeBoxes[other.id];
+          if (!beforeOther) continue;
+          const otherDelta = propagatedDeltas.get(other.id) ?? { x: other.state.x - beforeOther.x, y: other.state.y - beforeOther.y };
+          if (otherDelta.x !== 0 || otherDelta.y !== 0) {
+            supportDx = otherDelta.x;
+            supportDy = otherDelta.y;
             break;
           }
         }
@@ -478,8 +487,11 @@ export class World {
         moveY(rect, 0, this.map, solids);
         box.state.x = rect.x;
         box.state.y = rect.y;
+        propagatedDeltas.set(box.id, { x: supportDx, y: supportDy });
+        moved.add(box.id);
       }
     }
+    return moved;
   }
 
   private otherBoxSolids(box: Box): SolidRect[] {
@@ -519,6 +531,34 @@ export class World {
     return false;
   }
 
+  private ghostPushChain(box: Box, dx: number, dy: number): Box[] {
+    const chain: Box[] = [];
+    const seen = new Set<number>();
+    let current: Box | null = box;
+    while (current && !seen.has(current.id) && !current.immovable) {
+      chain.push(current);
+      seen.add(current.id);
+
+      const currentRect = { x: current.state.x, y: current.state.y, w: current.w, h: current.h };
+      const next = this.boxes.find((candidate): boolean => {
+        if (candidate === current || seen.has(candidate.id) || candidate.immovable) return false;
+        const candidateRect = { x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h };
+        if (dx !== 0) {
+          const sameRow = Math.abs(candidateRect.y - currentRect.y) < 2;
+          const expectedX = currentRect.x + Math.sign(dx) * currentRect.w;
+          const alongDirection = Math.sign(dx) > 0 ? candidateRect.x > currentRect.x : candidateRect.x < currentRect.x;
+          return sameRow && alongDirection && Math.abs(candidateRect.x - expectedX) < 2;
+        }
+        const sameColumn = Math.abs(candidateRect.x - currentRect.x) < 2;
+        const expectedY = currentRect.y + Math.sign(dy) * currentRect.h;
+        const alongDirection = Math.sign(dy) > 0 ? candidateRect.y > currentRect.y : candidateRect.y < currentRect.y;
+        return sameColumn && alongDirection && Math.abs(candidateRect.y - expectedY) < 2;
+      });
+      current = next ?? null;
+    }
+    return chain;
+  }
+
   /**
    * Applies the motion of every recorded body to the objects it touches on the
    * way from `now` to `target`: a crate directly resting on a ghost travels with
@@ -526,9 +566,12 @@ export class World {
    * body acts on a given object per tick, so overlapping ghosts never fight over a
    * crate.
    */
+  private ghostPushedIds = new Set<number>();
+
   private applyGhostMotion(target: number): Set<number> {
     const claimed = new Set<number>();
     const carried = new Set<number>();
+    this.ghostPushedIds.clear();
     for (const run of this.runs) {
       const prev = run.states[this.now];
       const next = run.states[target];
@@ -550,22 +593,36 @@ export class World {
           moveY(rect, dy, this.map, others);
           claimed.add(box.id);
           carried.add(box.id);
+          box.state.x = rect.x;
+          box.state.y = rect.y;
         } else if (rectsOverlap(nr, rect)) {
-          if (dx !== 0) {
-            const out = dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w);
-            moveX(rect, out, this.map, others);
-            claimed.add(box.id);
-          } else if (dy < 0) {
-            moveY(rect, nr.y - EPS - (rect.y + rect.h), this.map, others);
-            claimed.add(box.id);
+          const chain = dx !== 0 ? this.ghostPushChain(box, dx, 0) : dy < 0 ? this.ghostPushChain(box, 0, dy) : [];
+          if (chain.length > 0) {
+            const pushAmount = dx !== 0
+              ? dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w)
+              : nr.y - EPS - (rect.y + rect.h);
+            const chainIds = new Set(chain.map((entry) => entry.id));
+            const beforeGhostSupport = this.boxes.map((box) => ({ x: box.state.x, y: box.state.y }));
+            for (const entry of chain) {
+              const entryRect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
+              const entrySolids = this.otherBoxSolids(entry).filter((solid) => !chainIds.has(solid.id));
+              if (dx !== 0) {
+                moveX(entryRect, pushAmount, this.map, entrySolids);
+              } else {
+                moveY(entryRect, pushAmount, this.map, entrySolids);
+              }
+              entry.state.x = entryRect.x;
+              entry.state.y = entryRect.y;
+              this.ghostPushedIds.add(entry.id);
+              claimed.add(entry.id);
+            }
+            const ghostMoved = this.carryBoxesBySupport(beforeGhostSupport, { x: this.player.x, y: this.player.y }, { x: this.player.x, y: this.player.y }, new Set(chain.map((entry) => entry.id)));
+            for (const id of ghostMoved) {
+              this.ghostPushedIds.add(id);
+              claimed.add(id);
+            }
           }
-          // After shoving the crate out of the ghost's way, ensure it hasn't
-          // been pushed into terrain or other solids.  The discrete moveX/moveY
-          // can leave the crate overlapping a wall at the edge of the shove.
-          depenetrate(rect, this.map, others, 'both');
         }
-        box.state.x = rect.x;
-        box.state.y = rect.y;
       }
     }
     return carried;
@@ -591,12 +648,15 @@ export class World {
       const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
       // A monolith is stopped by the ground and by whatever crate is under it, and by
       // nothing else: not by a pad, not by a former self, and never sideways.
+      const pushedSolids = this.boxes
+        .filter((o) => o !== box && this.ghostPushedIds.has(o.id))
+        .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
       const others = box.immovable
         ? this.boxes
           .filter((o) => o !== box && !o.immovable)
           .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
           .concat(this.phaseSolids(), this.springs)
-        : [...this.otherBoxSolids(box), ...ghosts];
+        : [...this.otherBoxSolids(box), ...ghosts, ...pushedSolids];
       if (!box.immovable) depenetrate(rect, this.map, others, 'both');
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);

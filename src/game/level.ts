@@ -868,6 +868,288 @@ function buildPrecognition(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildCrouch(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 16, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 15); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
+  fill(grid, 17, 0, 42, 0);
+  fill(grid, 17, 1, 17, 1);
+  fill(grid, 17, 2, 19, 2);
+  fill(grid, 14, 3, 14, 3);
+  fill(grid, 19, 3, 19, 3);
+  fill(grid, 14, 4, 14, 4);
+  fill(grid, 19, 4, 19, 4);
+  fill(grid, 14, 5, 14, 5);
+  fill(grid, 19, 5, 21, 5);
+  fill(grid, 12, 6, 12, 6);
+  fill(grid, 14, 6, 16, 6);
+  fill(grid, 21, 6, 21, 6);
+  fill(grid, 12, 7, 12, 7);
+  fill(grid, 14, 7, 14, 7);
+  fill(grid, 16, 7, 16, 7);
+  fill(grid, 21, 7, 21, 7);
+  fill(grid, 12, 8, 12, 8);
+  fill(grid, 14, 8, 14, 8);
+  fill(grid, 16, 8, 16, 8);
+  fill(grid, 21, 8, 24, 8);
+  fill(grid, 10, 9, 10, 9);
+  fill(grid, 12, 9, 12, 9);
+  fill(grid, 14, 9, 14, 9);
+  fill(grid, 16, 9, 18, 9);
+  fill(grid, 24, 9, 24, 9);
+  fill(grid, 10, 10, 10, 10);
+  fill(grid, 12, 10, 12, 10);
+  fill(grid, 14, 10, 14, 10);
+  fill(grid, 16, 10, 16, 10);
+  fill(grid, 18, 10, 18, 10);
+  fill(grid, 24, 10, 38, 10);
+  fill(grid, 10, 11, 10, 11);
+  fill(grid, 12, 11, 12, 11);
+  fill(grid, 14, 11, 14, 11);
+  fill(grid, 16, 11, 16, 11);
+  fill(grid, 18, 11, 18, 11);
+  fill(grid, 8, 12, 8, 12);
+  fill(grid, 10, 12, 10, 12);
+  fill(grid, 12, 12, 12, 12);
+  fill(grid, 14, 12, 14, 12);
+  fill(grid, 16, 12, 16, 12);
+  fill(grid, 18, 12, 20, 12);
+  fill(grid, 8, 13, 8, 13);
+  fill(grid, 10, 13, 10, 13);
+  fill(grid, 12, 13, 12, 13);
+  fill(grid, 14, 13, 14, 13);
+  fill(grid, 16, 13, 16, 13);
+  fill(grid, 18, 13, 18, 13);
+  fill(grid, 20, 13, 20, 13);
+  fill(grid, 8, 14, 8, 14);
+  fill(grid, 10, 14, 10, 14);
+  fill(grid, 12, 14, 12, 14);
+  fill(grid, 16, 14, 16, 14);
+  fill(grid, 18, 14, 18, 14);
+  fill(grid, 20, 14, 20, 14);
+  fill(grid, 1, 15, 40, 15);
+  fill(grid, 42, 15, 42, 15);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Crouch',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 37 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 10 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 8 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }],
+    devices: [],
+    buttons: [],
+    phase: [],
+    hazards: [{ x: 11 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 17 * TILE, y: 3 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 6 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 6 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 3 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 13 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 1 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 1 * TILE, w: TILE, h: TILE }],
+    springs: [spring(6, 15), spring(8, 12), spring(10, 9), spring(12, 6), spring(16, 6), spring(18, 9), spring(20, 12), spring(25, 15), spring(26, 15), spring(27, 15), spring(28, 15), spring(29, 15), spring(41, 16)],
+    exit: { x: 21.5 * TILE, y: 3 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildDissolution(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 16, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 15); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
+  fill(grid, 1, 2, 13, 2);
+  fill(grid, 18, 2, 42, 2);
+  fill(grid, 36, 3, 36, 3);
+  fill(grid, 36, 4, 36, 4);
+  fill(grid, 36, 5, 36, 5);
+  fill(grid, 36, 6, 36, 6);
+  fill(grid, 15, 7, 18, 7);
+  fill(grid, 24, 7, 24, 7);
+  fill(grid, 36, 7, 36, 7);
+  fill(grid, 14, 8, 15, 8);
+  fill(grid, 24, 8, 24, 8);
+  fill(grid, 36, 8, 36, 8);
+  fill(grid, 13, 9, 14, 9);
+  fill(grid, 24, 9, 24, 9);
+  fill(grid, 36, 9, 36, 9);
+  fill(grid, 12, 10, 13, 10);
+  fill(grid, 24, 10, 24, 10);
+  fill(grid, 36, 10, 36, 10);
+  fill(grid, 11, 11, 12, 11);
+  fill(grid, 24, 11, 33, 11);
+  fill(grid, 36, 11, 36, 11);
+  fill(grid, 10, 12, 11, 12);
+  fill(grid, 24, 12, 24, 12);
+  fill(grid, 28, 12, 28, 12);
+  fill(grid, 32, 12, 32, 12);
+  fill(grid, 36, 12, 36, 12);
+  fill(grid, 9, 13, 10, 13);
+  fill(grid, 26, 13, 26, 13);
+  fill(grid, 30, 13, 30, 13);
+  fill(grid, 36, 13, 36, 13);
+  fill(grid, 40, 13, 42, 13);
+  fill(grid, 8, 14, 9, 14);
+  fill(grid, 18, 14, 36, 14);
+  fill(grid, 40, 14, 40, 14);
+  fill(grid, 1, 15, 9, 15);
+  fill(grid, 40, 15, 40, 15);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Dissolution',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 16 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 26, 11, 'CHRONOPORTER'), pad('chronoclast', 32, 11, 'CHRONOCLAST')],
+    buttons: [button(29, 11, 0)],
+    phase: [...phaseBlocks(0, 15, 2, 17, 2), ...phaseBlocks(0, 20, 7, 23, 7), ...phaseBlocks(0, 14, 2, 14, 2), ...phaseBlocks(0, 19, 7, 19, 7)],
+    hazards: [],
+    hazardsInverted: [{ x: 15 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 13 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 41.5 * TILE, y: 12 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildDistraction(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, 39, 1, 43, 1);
+  fill(grid, 33, 2, 39, 2);
+  fill(grid, 43, 2, 43, 2);
+  fill(grid, 39, 3, 39, 3);
+  fill(grid, 43, 3, 43, 3);
+  fill(grid, 39, 4, 39, 4);
+  fill(grid, 43, 4, 43, 4);
+  fill(grid, 39, 5, 39, 5);
+  fill(grid, 43, 5, 43, 5);
+  fill(grid, 39, 6, 39, 6);
+  fill(grid, 43, 6, 43, 6);
+  fill(grid, 16, 7, 18, 7);
+  fill(grid, 39, 7, 40, 7);
+  fill(grid, 43, 7, 43, 7);
+  fill(grid, 39, 8, 39, 8);
+  fill(grid, 43, 8, 43, 8);
+  fill(grid, 14, 9, 18, 9);
+  fill(grid, 30, 9, 30, 9);
+  fill(grid, 39, 9, 39, 9);
+  fill(grid, 42, 9, 43, 9);
+  fill(grid, 30, 10, 32, 10);
+  fill(grid, 39, 10, 39, 10);
+  fill(grid, 43, 10, 43, 10);
+  fill(grid, 12, 11, 18, 11);
+  fill(grid, 30, 11, 32, 11);
+  fill(grid, 43, 11, 43, 11);
+  fill(grid, 27, 12, 29, 12);
+  fill(grid, 43, 12, 43, 12);
+  fill(grid, 10, 13, 18, 13);
+  fill(grid, 27, 13, 27, 13);
+  fill(grid, 29, 13, 29, 13);
+  fill(grid, 43, 13, 43, 13);
+  fill(grid, 27, 14, 29, 14);
+  fill(grid, 43, 14, 43, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Distraction',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 17 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 11 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 17 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 6, 15, 'CHRONOPORTER'), pad('chronoclast', 35, 2, 'CHRONOCLAST')],
+    buttons: [],
+    phase: [],
+    hazards: [{ x: 39 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 43 * TILE, y: 0 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [],
+    springs: [spring(25, 15), spring(28, 12)],
+    exit: { x: 41.5 * TILE, y: 5 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildPrecision(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 7, 4, 7, 4);
+  fill(grid, 10, 4, 14, 4);
+  fill(grid, 25, 4, 42, 4);
+  fill(grid, 4, 5, 4, 5);
+  fill(grid, 14, 5, 14, 5);
+  fill(grid, 25, 5, 25, 5);
+  fill(grid, 14, 6, 16, 6);
+  fill(grid, 18, 6, 20, 6);
+  fill(grid, 22, 6, 22, 6);
+  fill(grid, 24, 6, 25, 6);
+  fill(grid, 2, 7, 2, 7);
+  fill(grid, 14, 7, 14, 7);
+  fill(grid, 25, 7, 25, 7);
+  fill(grid, 25, 8, 25, 8);
+  fill(grid, 3, 9, 3, 9);
+  fill(grid, 9, 9, 14, 9);
+  fill(grid, 25, 9, 25, 9);
+  fill(grid, 6, 10, 6, 10);
+  fill(grid, 12, 10, 12, 10);
+  fill(grid, 14, 10, 14, 10);
+  fill(grid, 25, 10, 25, 10);
+  fill(grid, 38, 10, 42, 10);
+  fill(grid, 12, 11, 15, 11);
+  fill(grid, 17, 11, 18, 11);
+  fill(grid, 20, 11, 21, 11);
+  fill(grid, 23, 11, 25, 11);
+  fill(grid, 38, 11, 38, 11);
+  fill(grid, 4, 12, 4, 12);
+  fill(grid, 38, 12, 38, 12);
+  fill(grid, 1, 13, 1, 13);
+  fill(grid, 13, 13, 29, 13);
+  fill(grid, 38, 13, 38, 13);
+  fill(grid, 38, 14, 38, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Precision',
+    map,
+    spawn: { x: 3 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 28 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 30 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 32 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 10, 15, 'CHRONOPORTER'), pad('chronoclast', 1, 15, 'CHRONOCLAST')],
+    buttons: [button(12, 4, 0), button(11, 9, 2)],
+    phase: [...phaseBlocks(0, 15, 4, 24, 4), ...phaseBlocks(2, 15, 9, 24, 9)],
+    hazards: [{ x: 15 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 10 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 15 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 7 * TILE, w: TILE, h: TILE }],
+    springs: [spring(14, 13), spring(15, 15)],
+    exit: { x: 40.5 * TILE, y: 9 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildHeap(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 9, 7, 13, 7);
+  fill(grid, 28, 7, 42, 7);
+  fill(grid, 6, 10, 6, 10);
+  fill(grid, 6, 11, 6, 11);
+  fill(grid, 6, 12, 6, 12);
+  fill(grid, 8, 12, 8, 12);
+  fill(grid, 8, 13, 8, 13);
+  fill(grid, 8, 14, 8, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Heap',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 31 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 32 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 32 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 33 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 33 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 33 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 34 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 34 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 34 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 34 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 35 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 35 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 35 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 35 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 35 * TILE, y: 3 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 3 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, { x: 39 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, { x: 39 * TILE, y: 3 * TILE - 28, w: 28, h: 28 }, { x: 39 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 39 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 39 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 39 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 3 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 11, 7, 'CHRONOPORTER')],
+    buttons: [button(11, 15, 3)],
+    phase: [...phaseBlocks(3, 27, 7, 27, 7), ...phaseBlocks(3, 26, 7, 26, 7), ...phaseBlocks(3, 25, 7, 25, 7), ...phaseBlocks(3, 24, 7, 24, 7), ...phaseBlocks(3, 23, 7, 23, 7), ...phaseBlocks(3, 22, 7, 22, 7), ...phaseBlocks(3, 21, 7, 21, 7), ...phaseBlocks(3, 20, 7, 20, 7), ...phaseBlocks(3, 19, 7, 19, 7), ...phaseBlocks(3, 18, 7, 18, 7), ...phaseBlocks(3, 17, 7, 17, 7), ...phaseBlocks(3, 16, 7, 16, 7), ...phaseBlocks(3, 15, 7, 15, 7), ...phaseBlocks(3, 14, 7, 14, 7)],
+    hazards: [{ x: 13 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [],
+    springs: [spring(7, 15), spring(8, 12), spring(6, 10)],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -889,6 +1171,11 @@ export const LEVELS: (() => LevelDef)[] = [
   buildInterception,
   buildPrecognition,
   buildSkyscraper,
+  buildCrouch,
+  buildDissolution,
+  buildDistraction,
+  buildPrecision,
+  buildHeap,
 ];
 
 export function buildLevel(index = 0): LevelDef {

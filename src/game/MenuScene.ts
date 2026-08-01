@@ -33,8 +33,10 @@ const TOP = 150;
 const LEFT = 120;
 const SPAN = VIEW_W - 240;
 const COL_GAP = 16;
-/** The last row has to clear the rule and the prompt under it. */
-const BOTTOM = VIEW_H - 70;
+const GRID_COLS = 3;
+const GRID_ROWS = 7;
+const LEVELS_PER_PAGE = GRID_COLS * GRID_ROWS;
+const GRID_H = GRID_ROWS * ROW_H - 8;
 const HELP = { x: VIEW_W / 2 - 44, y: VIEW_H - 34, w: 88, h: 24 };
 const SETTINGS = { x: VIEW_W - 180, y: VIEW_H - 34, w: 120, h: 24 };
 // Settings panel layout
@@ -46,6 +48,9 @@ const SETTINGS_ROW_GAP = 6;
 const SETTINGS_FIRST_ROW_Y = 200;
 
 const LEVEL_PADDING = 8;
+const PREV_PAGE = { x: LEFT - 60, y: TOP + GRID_H / 2 - 36, w: 42, h: 72 };
+const NEXT_PAGE = { x: LEFT + SPAN + 18, y: TOP + GRID_H / 2 - 36, w: 42, h: 72 };
+const PAGE_SLIDE_MS = 340;
 
 function hit(b: { x: number; y: number; w: number; h: number }, p: Phaser.Input.Pointer): boolean {
   return p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h;
@@ -68,20 +73,19 @@ interface Star {
   color: number;
 }
 
-/** How the list is laid out for a given number of levels: down, then across. */
-function layout(count: number): { perCol: number; cols: number; width: number } {
-  const fits = Math.max(1, Math.floor((BOTTOM - TOP) / ROW_H));
-  const cols = Math.max(1, Math.ceil(count / fits));
-  const perCol = Math.ceil(count / cols);
-  return { perCol, cols, width: (SPAN - COL_GAP * (cols - 1)) / cols };
+interface PageTransition {
+  from: number;
+  to: number;
+  direction: -1 | 1;
+  startedAt: number;
 }
 
-/** Where a level's row sits. */
-function slot(i: number, count: number): { x: number; y: number; w: number } {
-  const { perCol, width } = layout(count);
+/** Where a slot sits inside a fixed 3 × 7 archive page. */
+function slot(i: number): { x: number; y: number; w: number } {
+  const width = (SPAN - COL_GAP * (GRID_COLS - 1)) / GRID_COLS;
   return {
-    x: LEFT + Math.floor(i / perCol) * (width + COL_GAP),
-    y: TOP + (i % perCol) * ROW_H,
+    x: LEFT + Math.floor(i / GRID_ROWS) * (width + COL_GAP),
+    y: TOP + (i % GRID_ROWS) * ROW_H,
     w: width,
   };
 }
@@ -98,6 +102,8 @@ export class MenuScene extends Phaser.Scene {
   private modalGfx!: Phaser.GameObjects.Graphics;
   private rows: Phaser.GameObjects.Text[] = [];
   private cursor = 0;
+  private page = 0;
+  private pageTransition: PageTransition | null = null;
   private code: string | null = null;
   private prompt!: Phaser.GameObjects.Text;
   private titleGlow!: Phaser.GameObjects.Text;
@@ -109,6 +115,7 @@ export class MenuScene extends Phaser.Scene {
   private helpButton!: Phaser.GameObjects.Text;
   private settingsButton!: Phaser.GameObjects.Text;
   private settingsRowTexts: Phaser.GameObjects.Text[] = [];
+  private pageText!: Phaser.GameObjects.Text;
   private pointerInLevels = false;
   private keyboardFocused = true;
 
@@ -164,7 +171,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.rows = LEVELS.map((_, i) => {
       const level = buildLevel(i);
-      const s = slot(i, LEVELS.length);
+      const s = slot(i % LEVELS_PER_PAGE);
       const rowText = COL_ROW_TEXT();
       return this.add
         .text(s.x + 20, s.y + 8, `${i + 1}. ${level.name.toUpperCase()}`, {
@@ -176,6 +183,12 @@ export class MenuScene extends Phaser.Scene {
         .setFixedSize(s.w - 28, 0)
         .setWordWrapWidth(s.w - 28);
     });
+
+    this.pageText = this.add
+      .text(VIEW_W - 92, 104, '', {
+        fontFamily: 'monospace', fontSize: '11px', color: accentCss,
+      })
+      .setOrigin(0.5);
 
     const secondary = COL_TEXT_SECONDARY();
     const secondaryCss = `#${secondary.toString(16).padStart(6, '0')}`;
@@ -232,10 +245,10 @@ export class MenuScene extends Phaser.Scene {
     kb.on('keydown-DOWN', () => this.move(1));
     kb.on('keydown-W', () => this.move(-1));
     kb.on('keydown-S', () => this.move(1));
-    kb.on('keydown-LEFT', () => this.move(-layout(LEVELS.length).perCol));
-    kb.on('keydown-RIGHT', () => this.move(layout(LEVELS.length).perCol));
-    kb.on('keydown-A', () => this.move(-layout(LEVELS.length).perCol));
-    kb.on('keydown-D', () => this.move(layout(LEVELS.length).perCol));
+    kb.on('keydown-LEFT', () => this.move(-GRID_ROWS));
+    kb.on('keydown-RIGHT', () => this.move(GRID_ROWS));
+    kb.on('keydown-A', () => this.move(-GRID_ROWS));
+    kb.on('keydown-D', () => this.move(GRID_ROWS));
     kb.on('keydown-ENTER', () => this.play(this.cursor));
     kb.on('keydown-SPACE', () => this.play(this.cursor));
     kb.on('keydown-H', () => this.toggleHelp());
@@ -254,7 +267,7 @@ export class MenuScene extends Phaser.Scene {
     kb.on('keydown', () => sfx.unlock());
     this.input.on('pointerdown', () => sfx.unlock());
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (this.modalOpen) return;
+      if (this.modalOpen || this.pageTransition) return;
       this.pointerInLevels = this.inLevelBounds(p);
       if (!this.pointerInLevels) {
         this.keyboardFocused = false;
@@ -264,6 +277,7 @@ export class MenuScene extends Phaser.Scene {
       if (row !== null && row !== this.cursor) this.move(row - this.cursor);
     });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (this.pageTransition) return;
       if (this.helpOpen) {
         this.toggleHelp();
         return;
@@ -282,6 +296,14 @@ export class MenuScene extends Phaser.Scene {
       }
       if (hit(SETTINGS, p)) {
         this.toggleSettings();
+        return;
+      }
+      if (this.canPreviousPage && hit(PREV_PAGE, p)) {
+        this.changePage(-1);
+        return;
+      }
+      if (this.canNextPage && hit(NEXT_PAGE, p)) {
+        this.changePage(1);
         return;
       }
       const row = this.rowAt(p);
@@ -331,13 +353,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private rowAt(p: Phaser.Input.Pointer): number | null {
-    const { perCol, cols, width } = layout(LEVELS.length);
+    const width = (SPAN - COL_GAP * (GRID_COLS - 1)) / GRID_COLS;
     const col = Math.floor((p.x - LEFT) / (width + COL_GAP));
-    if (col < 0 || col >= cols) return null;
+    if (col < 0 || col >= GRID_COLS) return null;
     if (p.x > LEFT + col * (width + COL_GAP) + width) return null;
     const row = Math.floor((p.y - TOP) / ROW_H);
-    if (row < 0 || row >= perCol) return null;
-    const i = col * perCol + row;
+    if (row < 0 || row >= GRID_ROWS) return null;
+    const i = this.page * LEVELS_PER_PAGE + col * GRID_ROWS + row;
     return i < LEVELS.length ? i : null;
   }
 
@@ -345,8 +367,10 @@ export class MenuScene extends Phaser.Scene {
     if (!this.inLevelBounds(p)) return null;
     let nearest = 0;
     let best = Number.POSITIVE_INFINITY;
-    LEVELS.forEach((_, i) => {
-      const s = slot(i, LEVELS.length);
+    const first = this.page * LEVELS_PER_PAGE;
+    const last = Math.min(first + LEVELS_PER_PAGE, LEVELS.length);
+    for (let i = first; i < last; i++) {
+      const s = slot(i - first);
       const dx = p.x - (s.x + s.w / 2);
       const dy = p.y - (s.y + (ROW_H - 8) / 2);
       const d2 = dx * dx + dy * dy;
@@ -354,30 +378,55 @@ export class MenuScene extends Phaser.Scene {
         nearest = i;
         best = d2;
       }
-    });
+    }
     return nearest;
   }
 
   private inLevelBounds(p: Phaser.Input.Pointer): boolean {
-    const { perCol } = layout(LEVELS.length);
-    const h = perCol * ROW_H - 8;
     return (
       p.x >= LEFT - LEVEL_PADDING &&
       p.x <= LEFT + SPAN + LEVEL_PADDING &&
       p.y >= TOP - LEVEL_PADDING &&
-      p.y <= TOP + h + LEVEL_PADDING
+      p.y <= TOP + GRID_H + LEVEL_PADDING
     );
   }
 
   private move(d: number): void {
-    if (this.modalOpen) return;
+    if (this.modalOpen || this.pageTransition) return;
     this.keyboardFocused = true;
     this.cursor = Phaser.Math.Wrap(this.cursor + d, 0, LEVELS.length);
+    this.page = Math.floor(this.cursor / LEVELS_PER_PAGE);
     sfx.menuMove();
   }
 
+  private changePage(delta: -1 | 1): void {
+    if (this.pageTransition) return;
+    const target = Phaser.Math.Clamp(this.page + delta, 0, this.pageCount - 1);
+    if (target === this.page) return;
+    const slotIndex = this.cursor % LEVELS_PER_PAGE;
+    const from = this.page;
+    this.page = target;
+    this.cursor = Math.min(this.page * LEVELS_PER_PAGE + slotIndex, LEVELS.length - 1);
+    this.keyboardFocused = false;
+    this.pointerInLevels = false;
+    this.pageTransition = { from, to: target, direction: delta, startedAt: this.time.now };
+    sfx.menuMove();
+  }
+
+  private get pageCount(): number {
+    return Math.max(1, Math.ceil(LEVELS.length / LEVELS_PER_PAGE));
+  }
+
+  private get canPreviousPage(): boolean {
+    return this.page > 0;
+  }
+
+  private get canNextPage(): boolean {
+    return this.page + 1 < this.pageCount;
+  }
+
   private play(index: number): void {
-    if (this.modalOpen) return;
+    if (this.modalOpen || this.pageTransition) return;
     sfx.unlock();
     sfx.menuSelect();
     music.stopMenu();
@@ -418,24 +467,21 @@ export class MenuScene extends Phaser.Scene {
     const complete = COL_COMPLETE();
     const rowText = COL_ROW_TEXT();
     const rowTextSelected = COL_ROW_TEXT_SELECTED();
-    LEVELS.forEach((_, i) => {
-      const on = (this.pointerInLevels || this.keyboardFocused) && i === this.cursor;
-      const s = slot(i, LEVELS.length);
-      const border = ROW_BORDER(on);
-      g.fillStyle(border, on ? 0.3 : 0.09).fillRect(s.x, s.y, s.w, ROW_H - 8);
-      g.lineStyle(1, border, on ? 0.95 : 0.3).strokeRect(s.x, s.y, s.w, ROW_H - 8);
-      this.rows[i].setColor(on ? rowTextSelected : rowText);
-      if (on) {
-        const pulse = 0.5 + 0.5 * Math.sin(time / 260);
-        g.fillStyle(orbitB, 0.08 + 0.08 * pulse).fillRect(s.x, s.y + 2, s.w, ROW_H - 12);
-        g.fillStyle(0xf7e26b, 0.4 + 0.5 * pulse).fillRect(s.x + 4, s.y + 6, 4, ROW_H - 18);
-      }
-      if (this.completed.has(i)) {
-        const x = s.x + s.w - 17;
-        const y = s.y + 18;
-        g.lineStyle(2, complete, 0.95).lineBetween(x, y, x + 4, y + 4).lineBetween(x + 4, y + 4, x + 11, y - 5);
-      }
-    });
+    for (const row of this.rows) row.setVisible(false);
+    const transition = this.pageTransition;
+    if (transition) {
+      const progress = Phaser.Math.Clamp((time - transition.startedAt) / PAGE_SLIDE_MS, 0, 1);
+      const eased = Phaser.Math.Easing.Cubic.Out(progress);
+      this.drawLevelPage(g, transition.from, -transition.direction * VIEW_W * eased, 1, time, orbitB, complete, rowText, rowTextSelected);
+      this.drawLevelPage(g, transition.to, transition.direction * VIEW_W * (1 - eased), 1, time, orbitB, complete, rowText, rowTextSelected);
+      if (progress === 1) this.pageTransition = null;
+    } else {
+      this.drawLevelPage(g, this.page, 0, 1, time, orbitB, complete, rowText, rowTextSelected);
+    }
+
+    this.pageText.setVisible(this.pageCount > 1).setText(`PAGE ${this.page + 1}/${this.pageCount}`);
+    if (!this.pageTransition && this.canPreviousPage) this.drawPageArrow(g, PREV_PAGE, -1, hit(PREV_PAGE, this.input.activePointer), t, orbitA);
+    if (!this.pageTransition && this.canNextPage) this.drawPageArrow(g, NEXT_PAGE, 1, hit(NEXT_PAGE, this.input.activePointer), t, orbitB);
 
     const separator = COL_SEPARATOR();
     g.fillStyle(separator, 0.7).fillRect(LEFT, VIEW_H - 42, SPAN, 1);
@@ -587,9 +633,65 @@ export class MenuScene extends Phaser.Scene {
     return this.helpOpen || this.settingsOpen;
   }
 
+  private drawLevelPage(
+    g: Phaser.GameObjects.Graphics,
+    page: number,
+    xOffset: number,
+    alpha: number,
+    time: number,
+    orbitB: number,
+    complete: number,
+    rowText: string,
+    rowTextSelected: string,
+  ): void {
+    const first = page * LEVELS_PER_PAGE;
+    const last = Math.min(first + LEVELS_PER_PAGE, LEVELS.length);
+    for (let i = first; i < last; i++) {
+      const on = !this.pageTransition && (this.pointerInLevels || this.keyboardFocused) && i === this.cursor;
+      const s = slot(i - first);
+      const x = s.x + xOffset;
+      const row = this.rows[i];
+      row.setPosition(x + 20, s.y + 8).setVisible(true).setAlpha(alpha).setColor(on ? rowTextSelected : rowText);
+      const border = ROW_BORDER(on);
+      g.fillStyle(border, (on ? 0.3 : 0.09) * alpha).fillRect(x, s.y, s.w, ROW_H - 8);
+      g.lineStyle(1, border, (on ? 0.95 : 0.3) * alpha).strokeRect(x, s.y, s.w, ROW_H - 8);
+      if (on) {
+        const pulse = 0.5 + 0.5 * Math.sin(time / 260);
+        g.fillStyle(orbitB, (0.08 + 0.08 * pulse) * alpha).fillRect(x, s.y + 2, s.w, ROW_H - 12);
+        g.fillStyle(0xf7e26b, (0.4 + 0.5 * pulse) * alpha).fillRect(x + 4, s.y + 6, 4, ROW_H - 18);
+      }
+      if (this.completed.has(i)) {
+        const checkX = x + s.w - 17;
+        const checkY = s.y + 18;
+        g.lineStyle(2, complete, 0.95 * alpha)
+          .lineBetween(checkX, checkY, checkX + 4, checkY + 4)
+          .lineBetween(checkX + 4, checkY + 4, checkX + 11, checkY - 5);
+      }
+    }
+  }
+
   private drawButton(g: Phaser.GameObjects.Graphics, b: { x: number; y: number; w: number; h: number }, over: boolean, color: number): void {
     g.fillStyle(color, over ? 0.3 : 0.14).fillRect(b.x, b.y, b.w, b.h);
     g.lineStyle(1, color, over ? 0.95 : 0.55).strokeRect(b.x, b.y, b.w, b.h);
+  }
+
+  private drawPageArrow(
+    g: Phaser.GameObjects.Graphics,
+    b: { x: number; y: number; w: number; h: number },
+    direction: -1 | 1,
+    over: boolean,
+    t: number,
+    color: number,
+  ): void {
+    const pulse = 0.45 + 0.35 * Math.sin(t * 4 + direction);
+    const nudge = over ? Math.sin(t * 10) * 3 * direction : 0;
+    g.fillStyle(color, over ? 0.24 + pulse * 0.2 : 0.1).fillRect(b.x, b.y, b.w, b.h);
+    g.lineStyle(1, color, over ? 0.75 + pulse * 0.25 : 0.38).strokeRect(b.x, b.y, b.w, b.h);
+    const cx = b.x + b.w / 2 + nudge;
+    const cy = b.y + b.h / 2;
+    g.fillStyle(color, over ? 0.98 : 0.7);
+    g.fillTriangle(cx + direction * 12, cy, cx - direction * 8, cy - 13, cx - direction * 8, cy + 13);
+    if (over) g.fillStyle(color, 0.15 + pulse * 0.12).fillCircle(cx, cy, 23 + pulse * 7);
   }
 
 }

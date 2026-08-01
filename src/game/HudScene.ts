@@ -282,14 +282,18 @@ export class HudScene extends Phaser.Scene {
     this.status.setText(said ? `${level}    ·    ${said}` : level);
 
     // How much lived time is left before an anomaly reaches the present.
-    const lead = scene.anomalyLead();
-    if (lead === null) {
+    if (scene.state === 'won') {
       this.anomaly.setText('');
     } else {
-      const left = (lead / 120).toFixed(2);
-      this.anomaly.setText(`ANOMALY CLOSING — ${left}s OF YOUR OWN PATH LEFT`);
-      const urgency = 1 - Math.min(1, lead / 120);
-      this.anomaly.setColor(`hsl(350, 100%, ${50 + 25 * (1 - urgency)}%)`);
+      const lead = scene.anomalyLead();
+      if (lead === null) {
+        this.anomaly.setText('');
+      } else {
+        const left = (lead / 120).toFixed(2);
+        this.anomaly.setText(`ANOMALY CLOSING — ${left}s OF YOUR OWN PATH LEFT`);
+        const urgency = 1 - Math.min(1, lead / 120);
+        this.anomaly.setColor(`hsl(350, 100%, ${50 + 25 * (1 - urgency)}%)`);
+      }
     }
 
     this.drawOverlay(scene);
