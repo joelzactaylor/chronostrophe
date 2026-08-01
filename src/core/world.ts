@@ -545,7 +545,11 @@ export class World {
     return false;
   }
 
-  private ghostPushChain(box: Box, dx: number, dy: number): Box[] {
+  /**
+   * The run of crates a shove travels through: the crate being shoved, then each
+   * one it is already up against along the direction of the shove.
+   */
+  private pushChain(box: Box, dx: number, dy: number): Box[] {
     const chain: Box[] = [];
     const seen = new Set<number>();
     let current: Box | null = box;
@@ -571,6 +575,27 @@ export class World {
       current = next ?? null;
     }
     return chain;
+  }
+
+  /**
+   * Shoves a chain of crates one step along an axis, far end first: the crate
+   * ahead has made its room by the time the one behind it moves, and every crate
+   * stays solid to every other throughout, so the chain travels as far as its most
+   * obstructed member allows and nothing is shoved into anything.
+   *
+   * The live body and a recorded one both shove through here, which is what keeps
+   * a replayed shove landing where the recorded one did.
+   */
+  private shoveChain(chain: Box[], delta: number, axis: 'x' | 'y'): void {
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const entry = chain[i];
+      const rect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
+      const solids = this.otherBoxSolids(entry);
+      if (axis === 'x') moveX(rect, delta, this.map, solids);
+      else moveY(rect, delta, this.map, solids);
+      entry.state.x = rect.x;
+      entry.state.y = rect.y;
+    }
   }
 
   /**
@@ -610,29 +635,24 @@ export class World {
           box.state.x = rect.x;
           box.state.y = rect.y;
         } else if (rectsOverlap(nr, rect)) {
-          const chain = dx !== 0 ? this.ghostPushChain(box, dx, 0) : dy < 0 ? this.ghostPushChain(box, 0, dy) : [];
+          const chain = dx !== 0 ? this.pushChain(box, dx, 0) : dy < 0 ? this.pushChain(box, 0, dy) : [];
           if (chain.length > 0) {
-            const pushAmount = dx !== 0
+            // A shoved crate travels at the crate push speed, whoever shoves it: the
+            // live body moves it a whole push step and then stands flush behind it, so
+            // a recorded body has to move it that same step rather than only far enough
+            // to clear itself. Shoving it only clear leaves the crates behind the first
+            // one engaged on different ticks than they were, and the pile replays out
+            // of step with the run that pushed it. A body travelling faster than the
+            // crates still may not end up inside one.
+            const clearance = dx !== 0
               ? dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w)
               : nr.y - EPS - (rect.y + rect.h);
-            const chainIds = new Set(chain.map((entry) => entry.id));
+            const pushAmount = dx !== 0
+              ? Math.sign(dx) * Math.max(BOX_PUSH_SPEED * DT, Math.abs(clearance))
+              : clearance;
             const beforeGhostSupport = this.boxes.map((box) => ({ x: box.state.x, y: box.state.y }));
-            // The chain is solved from its front: members are transparent to each
-            // other, so each one may only travel as far as the one ahead of it did.
-            let allowed = pushAmount;
+            this.shoveChain(chain, pushAmount, dx !== 0 ? 'x' : 'y');
             for (const entry of chain) {
-              if (allowed === 0) break;
-              const entryRect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
-              const entrySolids = this.otherBoxSolids(entry).filter((solid) => !chainIds.has(solid.id));
-              if (dx !== 0) {
-                moveX(entryRect, allowed, this.map, entrySolids);
-                allowed = entryRect.x - entry.state.x;
-              } else {
-                moveY(entryRect, allowed, this.map, entrySolids);
-                allowed = entryRect.y - entry.state.y;
-              }
-              entry.state.x = entryRect.x;
-              entry.state.y = entryRect.y;
               this.ghostPushedIds.add(entry.id);
               claimed.add(entry.id);
             }
@@ -801,27 +821,7 @@ export class World {
   private pushBox(box: Box, dirSign: number, playerRectAfter: Rect): void {
     if (!box || dirSign === 0 || box.immovable) return;
 
-    const chain: Box[] = [];
-    const seen = new Set<number>();
-    let current: Box | null = box;
-    while (current && !seen.has(current.id) && !current.immovable) {
-      chain.push(current);
-      seen.add(current.id);
-
-      const currentBox: Box = current;
-      const currentRect = { x: currentBox.state.x, y: currentBox.state.y, w: currentBox.w, h: currentBox.h };
-      const next = this.boxes.find((candidate): boolean => {
-        if (candidate === currentBox || seen.has(candidate.id) || candidate.immovable) return false;
-        const candidateRect = { x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h };
-        const sameRow = Math.abs(candidateRect.y - currentRect.y) < 2;
-        const expectedX = currentRect.x + dirSign * currentRect.w;
-        const alongDirection = dirSign > 0 ? candidateRect.x > currentRect.x : candidateRect.x < currentRect.x;
-        const aligned = Math.abs(candidateRect.x - expectedX) < 2;
-        return sameRow && alongDirection && aligned;
-      });
-      current = next ?? null;
-    }
-
+    const chain = this.pushChain(box, dirSign, 0);
     if (chain.length === 0) return;
 
     const front = chain[0];
@@ -830,19 +830,8 @@ export class World {
       return;
     }
 
-    const pushDelta = dirSign * BOX_PUSH_SPEED * DT;
-    for (const entry of chain) {
-      const rect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
-      const solids = this.boxes
-        .filter((candidate) => candidate.id !== entry.id)
-        .map((candidate) => ({ x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h, id: candidate.id }))
-        .concat(this.deviceSolids, this.phaseSolids(), this.springs);
-      moveX(rect, pushDelta, this.map, solids);
-      entry.state.x = rect.x;
-      if (entry === front) {
-        playerRectAfter.x = dirSign > 0 ? rect.x - playerRectAfter.w - 0.02 : rect.x + rect.w + 0.02;
-      }
-    }
+    this.shoveChain(chain, dirSign * BOX_PUSH_SPEED * DT, 'x');
+    playerRectAfter.x = dirSign > 0 ? front.state.x - playerRectAfter.w - 0.02 : front.state.x + front.w + 0.02;
   }
 
   /**
