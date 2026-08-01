@@ -29,6 +29,12 @@ export const PLAYER_W = 20;
 export const PLAYER_H = 28;
 export const PLAYER_DUCK_H = 16;
 export const BOX_PUSH_SPEED = 130;
+/**
+ * What each crate beyond the first costs a shove: a lone crate slides at
+ * BOX_PUSH_SPEED, a heap of them barely gives, and the weight compounds with
+ * every crate in the load rather than only with the ones being touched.
+ */
+export const BOX_LOAD_DRAG = 0.15;
 
 /**
  * How hard a spring throws a body: v = sqrt(2 g h) for h = 120px, so a bounce
@@ -449,35 +455,32 @@ export class World {
       let supportDx = 0;
       let supportDy = 0;
 
-      if (playerDx !== 0 || playerDy !== 0) {
-        const r = playerRect(this.player);
-        const supportsPlayer = rectsOverlap(probe, r) && r.y >= box.state.y + box.h - 4 && r.y <= box.state.y + box.h + 4;
-        if (supportsPlayer) {
-          supportDx = playerDx;
-          supportDy = playerDy;
-        }
-      }
+      // A box straddling several supports travels with the most constrained of
+      // them: taking any other would slide it off a support that was blocked. The
+      // body counts as one of those supports and gets no say over the others —
+      // shoving a stack sideways puts a body's head under the crate above the one
+      // it is shoving, and a body walks faster than it pushes.
+      let least = Infinity;
+      const consider = (dx: number, dy: number): void => {
+        if (dx === 0 && dy === 0) return;
+        const magnitude = Math.hypot(dx, dy);
+        if (magnitude >= least) return;
+        least = magnitude;
+        supportDx = dx;
+        supportDy = dy;
+      };
+      const supports = (r: Rect): boolean =>
+        rectsOverlap(probe, r) && r.y >= box.state.y + box.h - 4 && r.y <= box.state.y + box.h + 4;
 
-      if (supportDx === 0 && supportDy === 0) {
-        // A box straddling several supports travels with the most constrained of
-        // them: taking any other would slide it off a support that was blocked.
-        let least = Infinity;
-        for (const other of orderedBoxes) {
-          if (other === box) continue;
-          const r = boxRect(other);
-          const supportsBox = rectsOverlap(probe, r) && r.y >= box.state.y + box.h - 4 && r.y <= box.state.y + box.h + 4;
-          if (!supportsBox) continue;
-          const beforeOther = beforeBoxes[other.id];
-          if (!beforeOther) continue;
-          const otherDelta = propagatedDeltas.get(other.id) ?? { x: other.state.x - beforeOther.x, y: other.state.y - beforeOther.y };
-          if (otherDelta.x === 0 && otherDelta.y === 0) continue;
-          const magnitude = Math.hypot(otherDelta.x, otherDelta.y);
-          if (magnitude < least) {
-            least = magnitude;
-            supportDx = otherDelta.x;
-            supportDy = otherDelta.y;
-          }
-        }
+      if ((playerDx !== 0 || playerDy !== 0) && supports(playerRect(this.player))) {
+        consider(playerDx, playerDy);
+      }
+      for (const other of orderedBoxes) {
+        if (other === box || !supports(boxRect(other))) continue;
+        const beforeOther = beforeBoxes[other.id];
+        if (!beforeOther) continue;
+        const otherDelta = propagatedDeltas.get(other.id) ?? { x: other.state.x - beforeOther.x, y: other.state.y - beforeOther.y };
+        consider(otherDelta.x, otherDelta.y);
       }
 
       if (supportDx !== 0 || supportDy !== 0) {
@@ -577,6 +580,26 @@ export class World {
     return chain;
   }
 
+  /** Every crate a shove has to move: the chain, and whatever rides on it. */
+  private shoveLoad(chain: Box[]): Set<number> {
+    const load = new Set<number>(chain.map((entry) => entry.id));
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const box of this.boxes) {
+        if (box.immovable || load.has(box.id)) continue;
+        if (!this.boxes.some((support) => load.has(support.id) && this.boxSupportsBox(support, box))) continue;
+        load.add(box.id);
+        grew = true;
+      }
+    }
+    return load;
+  }
+
+  /** How far a shove moves its load in one tick, which is less the heavier it is. */
+  private shoveStep(chain: Box[]): number {
+    return (BOX_PUSH_SPEED * DT) / (1 + BOX_LOAD_DRAG * (this.shoveLoad(chain).size - 1));
+  }
+
   /**
    * Shoves a chain of crates one step along an axis, far end first: the crate
    * ahead has made its room by the time the one behind it moves, and every crate
@@ -647,8 +670,9 @@ export class World {
             const clearance = dx !== 0
               ? dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w)
               : nr.y - EPS - (rect.y + rect.h);
+            const step = this.shoveStep(chain);
             const pushAmount = dx !== 0
-              ? Math.sign(dx) * Math.max(BOX_PUSH_SPEED * DT, Math.abs(clearance))
+              ? Math.sign(dx) * Math.max(step, Math.abs(clearance))
               : clearance;
             const beforeGhostSupport = this.boxes.map((box) => ({ x: box.state.x, y: box.state.y }));
             this.shoveChain(chain, pushAmount, dx !== 0 ? 'x' : 'y');
@@ -825,12 +849,13 @@ export class World {
     if (chain.length === 0) return;
 
     const front = chain[0];
-    const proposed: Rect = { x: front.state.x + dirSign * BOX_PUSH_SPEED * DT, y: front.state.y, w: front.w, h: front.h };
+    const step = this.shoveStep(chain);
+    const proposed: Rect = { x: front.state.x + dirSign * step, y: front.state.y, w: front.w, h: front.h };
     if (rectsOverlap(proposed, playerRectAfter)) {
       return;
     }
 
-    this.shoveChain(chain, dirSign * BOX_PUSH_SPEED * DT, 'x');
+    this.shoveChain(chain, dirSign * step, 'x');
     playerRectAfter.x = dirSign > 0 ? front.state.x - playerRectAfter.w - 0.02 : front.state.x + front.w + 0.02;
   }
 
