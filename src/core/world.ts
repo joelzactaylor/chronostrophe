@@ -455,6 +455,9 @@ export class World {
       }
 
       if (supportDx === 0 && supportDy === 0) {
+        // A box straddling several supports travels with the most constrained of
+        // them: taking any other would slide it off a support that was blocked.
+        let least = Infinity;
         for (const other of orderedBoxes) {
           if (other === box) continue;
           const r = boxRect(other);
@@ -463,10 +466,12 @@ export class World {
           const beforeOther = beforeBoxes[other.id];
           if (!beforeOther) continue;
           const otherDelta = propagatedDeltas.get(other.id) ?? { x: other.state.x - beforeOther.x, y: other.state.y - beforeOther.y };
-          if (otherDelta.x !== 0 || otherDelta.y !== 0) {
+          if (otherDelta.x === 0 && otherDelta.y === 0) continue;
+          const magnitude = Math.hypot(otherDelta.x, otherDelta.y);
+          if (magnitude < least) {
+            least = magnitude;
             supportDx = otherDelta.x;
             supportDy = otherDelta.y;
-            break;
           }
         }
       }
@@ -487,7 +492,12 @@ export class World {
         moveY(rect, 0, this.map, solids);
         box.state.x = rect.x;
         box.state.y = rect.y;
-        propagatedDeltas.set(box.id, { x: supportDx, y: supportDy });
+        // Whatever rides this box inherits how far it actually got, not how far it
+        // was asked to go: a support stopped by a wall must not carry the layers
+        // above it off its own back.
+        propagatedDeltas.set(box.id, before
+          ? { x: box.state.x - before.x, y: box.state.y - before.y }
+          : { x: supportDx, y: supportDy });
         moved.add(box.id);
       }
     }
@@ -603,13 +613,19 @@ export class World {
               : nr.y - EPS - (rect.y + rect.h);
             const chainIds = new Set(chain.map((entry) => entry.id));
             const beforeGhostSupport = this.boxes.map((box) => ({ x: box.state.x, y: box.state.y }));
+            // The chain is solved from its front: members are transparent to each
+            // other, so each one may only travel as far as the one ahead of it did.
+            let allowed = pushAmount;
             for (const entry of chain) {
+              if (allowed === 0) break;
               const entryRect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
               const entrySolids = this.otherBoxSolids(entry).filter((solid) => !chainIds.has(solid.id));
               if (dx !== 0) {
-                moveX(entryRect, pushAmount, this.map, entrySolids);
+                moveX(entryRect, allowed, this.map, entrySolids);
+                allowed = entryRect.x - entry.state.x;
               } else {
-                moveY(entryRect, pushAmount, this.map, entrySolids);
+                moveY(entryRect, allowed, this.map, entrySolids);
+                allowed = entryRect.y - entry.state.y;
               }
               entry.state.x = entryRect.x;
               entry.state.y = entryRect.y;
