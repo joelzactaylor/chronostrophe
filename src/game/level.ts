@@ -1064,58 +1064,59 @@ function buildDistraction(): LevelDef {
 }
 
 /** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
-function buildPrecision(): LevelDef {
+function buildTroupe(): LevelDef {
   const grid = blankGrid();
   fill(grid, 0, 15, COLS - 1, 16); // floor
   fill(grid, 0, 0, 0, 14); // left wall
   fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
   fill(grid, 7, 4, 7, 4);
   fill(grid, 10, 4, 14, 4);
-  fill(grid, 25, 4, 42, 4);
+  fill(grid, 34, 4, 42, 4);
   fill(grid, 4, 5, 4, 5);
   fill(grid, 14, 5, 14, 5);
-  fill(grid, 25, 5, 25, 5);
+  fill(grid, 34, 5, 34, 5);
+  fill(grid, 37, 5, 37, 5);
   fill(grid, 14, 6, 16, 6);
-  fill(grid, 18, 6, 20, 6);
-  fill(grid, 22, 6, 22, 6);
-  fill(grid, 24, 6, 25, 6);
+  fill(grid, 19, 6, 22, 6);
+  fill(grid, 25, 6, 27, 6);
+  fill(grid, 30, 6, 34, 6);
+  fill(grid, 37, 6, 37, 6);
   fill(grid, 2, 7, 2, 7);
   fill(grid, 14, 7, 14, 7);
-  fill(grid, 25, 7, 25, 7);
-  fill(grid, 25, 8, 25, 8);
+  fill(grid, 34, 7, 34, 7);
+  fill(grid, 37, 7, 37, 7);
+  fill(grid, 34, 8, 34, 8);
+  fill(grid, 37, 8, 37, 8);
   fill(grid, 3, 9, 3, 9);
   fill(grid, 9, 9, 14, 9);
-  fill(grid, 25, 9, 25, 9);
+  fill(grid, 34, 9, 34, 9);
+  fill(grid, 37, 9, 37, 9);
   fill(grid, 6, 10, 6, 10);
   fill(grid, 12, 10, 12, 10);
   fill(grid, 14, 10, 14, 10);
-  fill(grid, 25, 10, 25, 10);
-  fill(grid, 38, 10, 42, 10);
-  fill(grid, 12, 11, 15, 11);
-  fill(grid, 17, 11, 18, 11);
-  fill(grid, 20, 11, 21, 11);
-  fill(grid, 23, 11, 25, 11);
-  fill(grid, 38, 11, 38, 11);
+  fill(grid, 34, 10, 34, 10);
+  fill(grid, 37, 10, 40, 10);
+  fill(grid, 12, 11, 20, 11);
+  fill(grid, 23, 11, 24, 11);
+  fill(grid, 27, 11, 30, 11);
+  fill(grid, 33, 11, 34, 11);
   fill(grid, 4, 12, 4, 12);
-  fill(grid, 38, 12, 38, 12);
   fill(grid, 1, 13, 1, 13);
-  fill(grid, 13, 13, 29, 13);
-  fill(grid, 38, 13, 38, 13);
-  fill(grid, 38, 14, 38, 14);
+  fill(grid, 13, 13, 36, 13);
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
-    name: 'Precision',
+    name: 'Troupe',
     map,
     spawn: { x: 3 * TILE, y: 15 * TILE - 28 },
-    boxes: [{ x: 28 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 30 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 32 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }],
-    devices: [pad('chronoporter', 10, 15, 'CHRONOPORTER'), pad('chronoclast', 1, 15, 'CHRONOCLAST')],
+    boxes: [{ x: 36 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 38 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoclast', 1, 15, 'CHRONOCLAST'), pad('chronoporter', 10, 15, 'CHRONOPORTER')],
     buttons: [button(12, 4, 0), button(11, 9, 2)],
-    phase: [...phaseBlocks(0, 15, 4, 24, 4), ...phaseBlocks(2, 15, 9, 24, 9)],
-    hazards: [{ x: 15 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 10 * TILE, w: TILE, h: TILE }],
-    hazardsInverted: [{ x: 15 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 7 * TILE, w: TILE, h: TILE }],
+    phase: [...phaseBlocks(0, 15, 4, 33, 4), ...phaseBlocks(2, 15, 9, 33, 9)],
+    hazards: [{ x: 15 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 10 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 15 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 7 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 7 * TILE, w: TILE, h: TILE }],
     springs: [spring(14, 13), spring(15, 15)],
-    exit: { x: 40.5 * TILE, y: 9 * TILE - 26, r: 22 },
+    exit: { x: 39.5 * TILE, y: 9 * TILE - 26, r: 22 },
   };
 }
 
@@ -1174,7 +1175,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildCrouch,
   buildDissolution,
   buildDistraction,
-  buildPrecision,
+  buildTroupe,
   buildHeap,
 ];
 
