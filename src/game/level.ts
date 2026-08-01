@@ -1000,7 +1000,7 @@ function buildDissolution(): LevelDef {
     devices: [pad('chronoporter', 26, 11, 'CHRONOPORTER'), pad('chronoclast', 32, 11, 'CHRONOCLAST')],
     buttons: [button(29, 11, 0)],
     phase: [...phaseBlocks(0, 15, 2, 17, 2), ...phaseBlocks(0, 20, 7, 23, 7), ...phaseBlocks(0, 14, 2, 14, 2), ...phaseBlocks(0, 19, 7, 19, 7)],
-    hazards: [],
+    hazards: [{ x: 18 * TILE, y: 6 * TILE, w: TILE, h: TILE }],
     hazardsInverted: [{ x: 15 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 13 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
     springs: [],
     exit: { x: 41.5 * TILE, y: 12 * TILE - 26, r: 22 },
