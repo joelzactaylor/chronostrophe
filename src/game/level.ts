@@ -1226,6 +1226,30 @@ function buildAscent(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildOrder(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 40, 9, 42, 9);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Order',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 19 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('anachroverter', 41, 15, 'ANACHROVERTER')],
+    buttons: [button(35, 15, 0), button(36, 15, 1), button(37, 15, 2), button(38, 15, 3)],
+    phase: [...phaseBlocks(1, 22, 9, 27, 9, true), ...phaseBlocks(2, 28, 9, 33, 9, true), ...phaseBlocks(3, 34, 9, 39, 9, true), ...phaseBlocks(0, 18, 9, 21, 9)],
+    hazards: [{ x: 33 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [],
+    springs: [],
+    exit: { x: 41.5 * TILE, y: 9 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1240,6 +1264,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildOneTwo,
   buildOverhead,
   buildEscapement,
+  buildOrder,
   buildStages,
   buildSwitchback,
   buildPatience,
