@@ -91,7 +91,7 @@ function slot(i: number): { x: number; y: number; w: number } {
 }
 
 /** The private level-authoring access sequence. */
-const EDITOR_CODE = '8147';
+const EDITOR_CODE = '1234';
 
 /**
  * Level select. Everything is unlocked: the levels teach one device each and are

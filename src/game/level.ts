@@ -1151,6 +1151,58 @@ function buildHeap(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildStilt(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 22, 6, 42, 6);
+  fill(grid, 15, 9, 15, 9);
+  fill(grid, 9, 11, 11, 11);
+  fill(grid, 30, 12, 32, 12);
+  fill(grid, 7, 13, 11, 13);
+  fill(grid, 30, 14, 34, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Stilt',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 10 * TILE, y: 11 * TILE - 28, w: 28, h: 28 }, { x: 10 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, { x: 31 * TILE, y: 12 * TILE - 28, w: 28, h: 28 }, { x: 31 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }, monolith(18, 2100), monolith(18, 2100)],
+    devices: [pad('chronoporter', 37, 15, 'CHRONOPORTER'), pad('chronoclast', 5, 15, 'CHRONOCLAST')],
+    buttons: [],
+    phase: [],
+    hazards: [],
+    hazardsInverted: [{ x: 18 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 9 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 26.5 * TILE, y: 6 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildSpaghetti(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Spaghetti',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 10 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }, monolith(4, 330)],
+    devices: [],
+    buttons: [button(4, 15, 0), button(5, 15, 1), button(6, 15, 2), button(7, 15, 3)],
+    phase: [...phaseBlocks(2, 42, 3, 42, 3), ...phaseBlocks(2, 41, 3, 41, 4), ...phaseBlocks(2, 40, 3, 40, 5), ...phaseBlocks(2, 39, 3, 39, 3), ...phaseBlocks(2, 38, 3, 38, 3), ...phaseBlocks(2, 37, 3, 37, 3), ...phaseBlocks(2, 32, 3, 32, 3), ...phaseBlocks(0, 42, 2, 42, 2), ...phaseBlocks(0, 41, 2, 41, 2), ...phaseBlocks(0, 40, 2, 40, 2), ...phaseBlocks(0, 39, 2, 39, 2), ...phaseBlocks(0, 38, 2, 38, 2), ...phaseBlocks(0, 37, 2, 37, 2), ...phaseBlocks(0, 36, 2, 36, 2), ...phaseBlocks(0, 35, 2, 35, 2), ...phaseBlocks(0, 34, 2, 34, 2), ...phaseBlocks(0, 33, 2, 33, 2), ...phaseBlocks(0, 32, 2, 32, 2), ...phaseBlocks(0, 26, 2, 31, 2), ...phaseBlocks(2, 31, 3, 31, 3), ...phaseBlocks(2, 30, 3, 30, 3), ...phaseBlocks(2, 29, 3, 29, 3), ...phaseBlocks(2, 28, 3, 28, 3), ...phaseBlocks(2, 27, 3, 27, 3), ...phaseBlocks(2, 26, 3, 26, 3), ...phaseBlocks(1, 26, 1, 42, 1), ...phaseBlocks(3, 26, 0, 42, 0), ...phaseBlocks(3, 22, 3, 22, 3), ...phaseBlocks(3, 21, 3, 21, 3), ...phaseBlocks(3, 20, 3, 20, 4), ...phaseBlocks(3, 19, 3, 19, 4), ...phaseBlocks(3, 18, 3, 18, 6), ...phaseBlocks(1, 23, 3, 25, 3), ...phaseBlocks(0, 25, 1, 25, 2), ...phaseBlocks(0, 24, 2, 24, 2), ...phaseBlocks(2, 25, 0, 25, 0), ...phaseBlocks(2, 24, 0, 24, 1), ...phaseBlocks(2, 23, 1, 23, 2), ...phaseBlocks(2, 22, 2, 22, 2), ...phaseBlocks(2, 22, 1, 22, 1), ...phaseBlocks(2, 21, 1, 21, 2), ...phaseBlocks(2, 20, 1, 20, 2), ...phaseBlocks(2, 19, 2, 19, 2), ...phaseBlocks(2, 19, 1, 19, 1), ...phaseBlocks(3, 33, 3, 36, 3), ...phaseBlocks(0, 25, 4, 36, 4), ...phaseBlocks(2, 24, 4, 24, 5), ...phaseBlocks(2, 23, 4, 23, 4), ...phaseBlocks(2, 22, 4, 22, 4), ...phaseBlocks(2, 21, 4, 21, 4), ...phaseBlocks(2, 25, 5, 30, 5), ...phaseBlocks(1, 20, 5, 23, 5), ...phaseBlocks(1, 23, 6, 30, 6), ...phaseBlocks(3, 31, 5, 31, 7), ...phaseBlocks(3, 30, 7, 30, 7), ...phaseBlocks(0, 29, 7, 29, 8), ...phaseBlocks(0, 30, 8, 34, 8), ...phaseBlocks(0, 34, 7, 38, 7), ...phaseBlocks(0, 38, 8, 38, 8), ...phaseBlocks(1, 33, 7, 33, 7), ...phaseBlocks(1, 33, 6, 33, 6), ...phaseBlocks(1, 33, 5, 33, 5), ...phaseBlocks(2, 32, 7, 32, 7), ...phaseBlocks(2, 32, 6, 32, 6), ...phaseBlocks(2, 32, 5, 32, 5), ...phaseBlocks(2, 34, 6, 34, 6), ...phaseBlocks(2, 34, 5, 34, 5), ...phaseBlocks(2, 37, 5, 39, 5), ...phaseBlocks(3, 39, 4, 39, 4), ...phaseBlocks(3, 38, 4, 38, 4), ...phaseBlocks(3, 37, 4, 37, 4), ...phaseBlocks(3, 35, 6, 35, 6), ...phaseBlocks(3, 37, 6, 41, 6), ...phaseBlocks(3, 41, 5, 42, 5), ...phaseBlocks(3, 42, 4, 42, 4), ...phaseBlocks(3, 29, 9, 32, 9), ...phaseBlocks(3, 34, 9, 34, 9), ...phaseBlocks(2, 35, 9, 35, 9), ...phaseBlocks(2, 35, 8, 37, 8), ...phaseBlocks(2, 37, 9, 39, 9), ...phaseBlocks(2, 39, 8, 40, 8), ...phaseBlocks(2, 40, 7, 42, 7), ...phaseBlocks(2, 42, 6, 42, 6), ...phaseBlocks(2, 39, 7, 39, 7), ...phaseBlocks(2, 28, 9, 28, 9), ...phaseBlocks(2, 28, 8, 28, 8), ...phaseBlocks(2, 28, 7, 28, 7), ...phaseBlocks(2, 27, 7, 27, 7), ...phaseBlocks(2, 26, 7, 26, 7), ...phaseBlocks(2, 25, 7, 25, 7), ...phaseBlocks(2, 24, 7, 24, 7), ...phaseBlocks(2, 23, 7, 23, 7), ...phaseBlocks(0, 36, 6, 36, 6), ...phaseBlocks(0, 35, 5, 35, 5), ...phaseBlocks(1, 36, 5, 36, 5), ...phaseBlocks(0, 22, 6, 22, 7), ...phaseBlocks(0, 21, 7, 21, 8), ...phaseBlocks(0, 20, 8, 20, 8), ...phaseBlocks(0, 19, 8, 19, 10), ...phaseBlocks(0, 20, 10, 24, 10), ...phaseBlocks(0, 24, 9, 26, 9), ...phaseBlocks(0, 26, 10, 26, 11), ...phaseBlocks(0, 27, 11, 30, 11), ...phaseBlocks(3, 20, 9, 23, 9), ...phaseBlocks(3, 22, 8, 27, 8), ...phaseBlocks(3, 27, 9, 27, 10), ...phaseBlocks(3, 28, 10, 30, 10), ...phaseBlocks(2, 30, 12, 30, 12), ...phaseBlocks(2, 29, 12, 29, 12), ...phaseBlocks(2, 28, 12, 28, 12), ...phaseBlocks(2, 27, 12, 27, 12), ...phaseBlocks(2, 26, 12, 26, 12), ...phaseBlocks(2, 25, 10, 25, 12), ...phaseBlocks(2, 24, 12, 24, 12), ...phaseBlocks(2, 23, 12, 23, 12), ...phaseBlocks(2, 22, 12, 22, 12), ...phaseBlocks(2, 21, 12, 21, 12), ...phaseBlocks(2, 20, 12, 20, 12), ...phaseBlocks(2, 19, 12, 19, 12), ...phaseBlocks(2, 18, 8, 18, 8), ...phaseBlocks(2, 18, 7, 20, 7), ...phaseBlocks(2, 21, 6, 21, 6), ...phaseBlocks(2, 20, 6, 20, 6), ...phaseBlocks(2, 19, 5, 19, 5), ...phaseBlocks(3, 19, 6, 19, 6), ...phaseBlocks(3, 18, 9, 18, 11), ...phaseBlocks(3, 19, 11, 20, 11), ...phaseBlocks(1, 21, 11, 24, 11), ...phaseBlocks(1, 31, 11, 31, 11), ...phaseBlocks(1, 31, 10, 37, 10), ...phaseBlocks(1, 41, 10, 42, 10), ...phaseBlocks(1, 40, 9, 42, 9), ...phaseBlocks(1, 41, 8, 42, 8), ...phaseBlocks(3, 31, 12, 32, 12), ...phaseBlocks(3, 32, 11, 32, 11), ...phaseBlocks(3, 34, 11, 40, 11), ...phaseBlocks(0, 40, 10, 40, 10), ...phaseBlocks(0, 39, 10, 39, 10), ...phaseBlocks(0, 38, 10, 38, 10), ...phaseBlocks(0, 36, 9, 36, 9), ...phaseBlocks(1, 41, 11, 41, 12), ...phaseBlocks(0, 40, 12, 40, 12), ...phaseBlocks(0, 39, 12, 39, 12), ...phaseBlocks(0, 38, 12, 38, 12), ...phaseBlocks(0, 37, 12, 37, 12), ...phaseBlocks(0, 36, 12, 36, 12), ...phaseBlocks(2, 36, 13, 39, 13), ...phaseBlocks(2, 42, 13, 42, 13), ...phaseBlocks(2, 42, 12, 42, 12), ...phaseBlocks(2, 42, 11, 42, 11), ...phaseBlocks(1, 23, 0, 23, 0), ...phaseBlocks(1, 22, 0, 22, 0), ...phaseBlocks(1, 21, 0, 21, 0), ...phaseBlocks(1, 20, 0, 20, 0), ...phaseBlocks(1, 19, 0, 19, 0), ...phaseBlocks(1, 18, 0, 18, 2), ...phaseBlocks(1, 18, 12, 18, 12), ...phaseBlocks(1, 35, 12, 35, 13), ...phaseBlocks(1, 34, 13, 34, 13), ...phaseBlocks(1, 33, 13, 33, 13), ...phaseBlocks(1, 32, 13, 32, 13), ...phaseBlocks(1, 31, 13, 31, 13), ...phaseBlocks(1, 29, 13, 29, 13), ...phaseBlocks(1, 33, 12, 34, 12), ...phaseBlocks(0, 18, 13, 19, 13), ...phaseBlocks(0, 26, 13, 28, 13), ...phaseBlocks(3, 20, 13, 25, 13), ...phaseBlocks(3, 30, 13, 30, 13), ...phaseBlocks(3, 40, 13, 41, 13), ...phaseBlocks(0, 33, 9, 33, 9), ...phaseBlocks(0, 33, 11, 33, 11)],
+    hazards: [],
+    hazardsInverted: [],
+    springs: [],
+    exit: { x: 39.5 * TILE, y: 3 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1177,6 +1229,8 @@ export const LEVELS: (() => LevelDef)[] = [
   buildDistraction,
   buildTroupe,
   buildHeap,
+  buildStilt,
+  buildSpaghetti,
 ];
 
 export function buildLevel(index = 0): LevelDef {
