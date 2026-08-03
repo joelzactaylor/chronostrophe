@@ -1250,6 +1250,33 @@ function buildOrder(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildStripes(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 0, 0, 16); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 16); // right wall
+  fill(grid, 14, 9, 26, 9);
+  fill(grid, 1, 15, 13, 15);
+  fill(grid, 27, 15, 42, 15);
+  fill(grid, 1, 16, 13, 16);
+  fill(grid, 27, 16, 42, 16);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Stripes',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [],
+    devices: [pad('anachroverter', 11, 15, 'ANACHROVERTER')],
+    buttons: [button(5, 15, 2), button(6, 15, 3), button(7, 15, 0), button(8, 15, 1)],
+    phase: [...phaseBlocks(0, 14, 14, 14, 14), ...phaseBlocks(0, 14, 13, 14, 13), ...phaseBlocks(0, 14, 12, 14, 12), ...phaseBlocks(0, 14, 11, 14, 11), ...phaseBlocks(1, 15, 14, 15, 14), ...phaseBlocks(1, 15, 13, 15, 13), ...phaseBlocks(1, 15, 12, 15, 12), ...phaseBlocks(1, 15, 11, 15, 11), ...phaseBlocks(1, 19, 14, 19, 14), ...phaseBlocks(1, 19, 13, 19, 13), ...phaseBlocks(1, 19, 12, 19, 12), ...phaseBlocks(1, 19, 11, 19, 11), ...phaseBlocks(2, 24, 14, 24, 14), ...phaseBlocks(2, 24, 13, 24, 13), ...phaseBlocks(2, 24, 12, 24, 12), ...phaseBlocks(2, 24, 11, 24, 11), ...phaseBlocks(2, 18, 14, 18, 14), ...phaseBlocks(2, 18, 13, 18, 13), ...phaseBlocks(2, 18, 12, 18, 12), ...phaseBlocks(2, 18, 11, 18, 11), ...phaseBlocks(2, 22, 14, 22, 14), ...phaseBlocks(2, 22, 13, 22, 13), ...phaseBlocks(2, 22, 12, 22, 12), ...phaseBlocks(2, 22, 11, 22, 11), ...phaseBlocks(3, 17, 14, 17, 14), ...phaseBlocks(3, 17, 13, 17, 13), ...phaseBlocks(3, 17, 12, 17, 12), ...phaseBlocks(3, 17, 11, 17, 11), ...phaseBlocks(3, 23, 11, 23, 14), ...phaseBlocks(0, 20, 14, 20, 14), ...phaseBlocks(0, 20, 13, 20, 13), ...phaseBlocks(0, 20, 12, 20, 12), ...phaseBlocks(0, 20, 11, 20, 11), ...phaseBlocks(0, 25, 11, 25, 14), ...phaseBlocks(1, 21, 11, 21, 14), ...phaseBlocks(2, 16, 11, 16, 14), ...phaseBlocks(2, 26, 11, 26, 14), ...phaseBlocks(2, 14, 15, 14, 15), ...phaseBlocks(0, 15, 15, 15, 15), ...phaseBlocks(1, 16, 15, 17, 15), ...phaseBlocks(0, 18, 15, 18, 15), ...phaseBlocks(3, 19, 15, 21, 15), ...phaseBlocks(0, 22, 15, 22, 15), ...phaseBlocks(1, 23, 15, 25, 15), ...phaseBlocks(3, 26, 15, 26, 15)],
+    hazards: [{ x: 26 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 16 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 14 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 10 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1265,6 +1292,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildOverhead,
   buildEscapement,
   buildOrder,
+  buildStripes,
   buildStages,
   buildSwitchback,
   buildPatience,
