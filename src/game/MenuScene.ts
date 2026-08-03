@@ -215,7 +215,7 @@ export class MenuScene extends Phaser.Scene {
     this.helpText = this.add
       .text(
         VIEW_W / 2,
-        178,
+        150,
         'TIME & CONTROLS\n\n' +
         '• The bar at the bottom of the screen is the timeline. If time reaches either\n' +
         '  red end marker, the universe ends and the level restarts.\n' +
@@ -223,7 +223,8 @@ export class MenuScene extends Phaser.Scene {
         '• Grey squares above the timeline mark events that happen at a fixed time.\n' +
         '• Use [A] [D] or [←] [→] to move. [W] [↑] or [SPACE] jumps; [S] [↓] crouches.\n' +
         '• [K] abandons the current run and restarts the level. [ESC] returns here.\n' +
-        '• [M] toggles sound.\n\n' +
+        '• [M] toggles sound.\n' +
+        '• If you create a paradox and you don\'t know why, it could be a numerical error\n made by an alternate self:\n if a crate is on the exact tipping point of falling from a ledge,\n then it may go either way in different playbacks.\n It\'s your own fault for making such an unstable timeline :)\n\n' +
         '[ CLICK, H, OR ESC TO CLOSE ]',
         {
           fontFamily: 'monospace',
@@ -501,8 +502,8 @@ export class MenuScene extends Phaser.Scene {
     const modalBg = COL_MODAL_BG();
     const settingsStroke = COL_SETTINGS_STROKE();
     if (this.helpOpen) {
-      this.modalGfx.fillStyle(modalBg, 0.9).fillRect(76, 140, VIEW_W - 152, 316);
-      this.modalGfx.lineStyle(2, settingsStroke, 0.8).strokeRect(76, 140, VIEW_W - 152, 316);
+      this.modalGfx.fillStyle(modalBg, 0.9).fillRect(76, 120, VIEW_W - 152, 396);
+      this.modalGfx.lineStyle(2, settingsStroke, 0.8).strokeRect(76, 120, VIEW_W - 152, 396);
       this.helpText.setVisible(true);
     } else {
       this.helpText.setVisible(false);
