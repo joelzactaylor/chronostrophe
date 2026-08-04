@@ -1313,6 +1313,40 @@ function buildCausality(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildFreefalling(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 0, 0, 16); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 16); // right wall
+  fill(grid, 1, 0, 42, 0);
+  fill(grid, 11, 1, 11, 1);
+  fill(grid, 14, 1, 14, 1);
+  fill(grid, 16, 1, 16, 1);
+  fill(grid, 7, 2, 20, 2);
+  fill(grid, 26, 2, 39, 2);
+  fill(grid, 20, 3, 26, 3);
+  fill(grid, 42, 13, 42, 13);
+  fill(grid, 1, 15, 5, 15);
+  fill(grid, 41, 15, 42, 15);
+  fill(grid, 1, 16, 5, 16);
+  fill(grid, 42, 16, 42, 16);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Freefalling',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 9 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 21 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 33 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }],
+    devices: [pad('chronoporter', 4, 15, 'CHRONOPORTER')],
+    buttons: [button(13, 15, 0), button(25, 15, 1), button(38, 15, 2), button(42, 15, 3), button(42, 13, 0), button(37, 2, 3)],
+    phase: [...phaseBlocks(0, 6, 15, 16, 15), ...phaseBlocks(0, 7, 8, 7, 9), ...phaseBlocks(0, 8, 9, 11, 9), ...phaseBlocks(1, 12, 9, 15, 9), ...phaseBlocks(1, 15, 8, 15, 8), ...phaseBlocks(1, 19, 8, 19, 9), ...phaseBlocks(1, 20, 9, 23, 9), ...phaseBlocks(2, 24, 9, 27, 9), ...phaseBlocks(2, 27, 8, 27, 8), ...phaseBlocks(1, 18, 15, 28, 15), ...phaseBlocks(2, 30, 15, 40, 15), ...phaseBlocks(2, 31, 8, 31, 9), ...phaseBlocks(2, 32, 9, 35, 9), ...phaseBlocks(3, 36, 9, 39, 9), ...phaseBlocks(3, 39, 8, 39, 8), ...phaseBlocks(1, 32, 1, 32, 1), ...phaseBlocks(0, 30, 1, 30, 1), ...phaseBlocks(3, 1, 13, 1, 13, true), ...phaseBlocks(3, 1, 11, 1, 11, true), ...phaseBlocks(3, 1, 9, 1, 9, true), ...phaseBlocks(3, 1, 7, 1, 7, true), ...phaseBlocks(0, 42, 6, 42, 6, true), ...phaseBlocks(0, 42, 4, 42, 4, true), ...phaseBlocks(0, 31, 1, 31, 1, true), ...phaseBlocks(1, 33, 1, 33, 1, true), ...phaseBlocks(2, 35, 1, 35, 1, true), ...phaseBlocks(2, 34, 1, 34, 1)],
+    hazards: [{ x: 6 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 16 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 7 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 10 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 23.5 * TILE, y: 3 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1345,6 +1379,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildStilt,
   buildSpaghetti,
   buildCausality,
+  buildFreefalling,
 ];
 
 export function buildLevel(index = 0): LevelDef {
