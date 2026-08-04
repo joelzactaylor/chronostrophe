@@ -1243,7 +1243,7 @@ function buildOrder(): LevelDef {
     devices: [pad('anachroverter', 41, 15, 'ANACHROVERTER')],
     buttons: [button(35, 15, 0), button(36, 15, 1), button(37, 15, 2), button(38, 15, 3)],
     phase: [...phaseBlocks(1, 22, 9, 27, 9, true), ...phaseBlocks(2, 28, 9, 33, 9, true), ...phaseBlocks(3, 34, 9, 39, 9, true), ...phaseBlocks(0, 18, 9, 21, 9)],
-    hazards: [{ x: 33 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazards: [{ x: 25 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
     hazardsInverted: [],
     springs: [],
     exit: { x: 41.5 * TILE, y: 9 * TILE - 26, r: 22 },
@@ -1282,34 +1282,36 @@ function buildCausality(): LevelDef {
   const grid = blankGrid();
   fill(grid, 0, 0, 0, 16); // left wall
   fill(grid, COLS - 1, 0, COLS - 1, 16); // right wall
-  fill(grid, 2, 2, 4, 2);
-  fill(grid, 4, 3, 4, 3);
-  fill(grid, 4, 4, 4, 4);
-  fill(grid, 4, 5, 4, 5);
-  fill(grid, 1, 6, 4, 6);
-  fill(grid, 9, 6, 9, 6);
-  fill(grid, 14, 6, 14, 6);
-  fill(grid, 19, 6, 42, 6);
-  fill(grid, 1, 15, 4, 15);
-  fill(grid, 24, 15, 29, 15);
-  fill(grid, 38, 15, 42, 15);
-  fill(grid, 1, 16, 4, 16);
-  fill(grid, 24, 16, 29, 16);
-  fill(grid, 38, 16, 42, 16);
+  fill(grid, 23, 0, 23, 0);
+  fill(grid, 23, 1, 23, 1);
+  fill(grid, 4, 2, 6, 2);
+  fill(grid, 23, 2, 23, 2);
+  fill(grid, 23, 3, 23, 3);
+  fill(grid, 23, 4, 23, 4);
+  fill(grid, 23, 5, 23, 5);
+  fill(grid, 1, 6, 6, 6);
+  fill(grid, 11, 6, 11, 6);
+  fill(grid, 16, 6, 38, 6);
+  fill(grid, 1, 15, 6, 15);
+  fill(grid, 21, 15, 26, 15);
+  fill(grid, 38, 15, 38, 15);
+  fill(grid, 1, 16, 6, 16);
+  fill(grid, 21, 16, 26, 16);
+  fill(grid, 38, 16, 38, 16);
   const map = new TileMap(grid.map((r) => r.join('')));
 
   return {
     name: 'Causality',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [{ x: 2 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }, monolith(5, 300), monolith(10, 600), monolith(15, 900), monolith(20, 1200)],
-    devices: [pad('anachroverter', 28, 15, 'ANACHROVERTER'), pad('anachroverter', 3, 2, 'ANACHROVERTER')],
-    buttons: [button(5, 6, 0), button(6, 6, 0), button(7, 6, 0), button(8, 6, 0), button(10, 6, 1), button(11, 6, 1), button(12, 6, 1), button(13, 6, 1), button(15, 6, 2), button(16, 6, 2), button(17, 6, 2), button(18, 6, 2), button(20, 6, 3), button(21, 6, 3), button(22, 6, 3), button(23, 6, 3), button(1, 6, 0)],
-    phase: [...phaseBlocks(1, 5, 6, 8, 6), ...phaseBlocks(2, 10, 6, 13, 6), ...phaseBlocks(3, 15, 6, 18, 6), ...phaseBlocks(0, 8, 15, 8, 15, true), ...phaseBlocks(0, 7, 15, 7, 15, true), ...phaseBlocks(0, 6, 15, 6, 15, true), ...phaseBlocks(0, 5, 15, 5, 15, true), ...phaseBlocks(1, 10, 15, 13, 15, true), ...phaseBlocks(2, 18, 15, 18, 15, true), ...phaseBlocks(2, 17, 15, 17, 15, true), ...phaseBlocks(2, 16, 15, 16, 15, true), ...phaseBlocks(2, 15, 15, 15, 15, true), ...phaseBlocks(3, 20, 15, 23, 15, true), ...phaseBlocks(0, 30, 15, 37, 15, true)],
-    hazards: [{ x: 5 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 6 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 16 * TILE, w: TILE, h: TILE }],
-    hazardsInverted: [{ x: 1 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 2 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 3 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 4 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 5 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 6 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 0 * TILE, w: TILE, h: TILE }],
+    boxes: [{ x: 5 * TILE, y: 6 * TILE - 28, w: 28, h: 28 }, monolith(7, 300), monolith(12, 600), monolith(17, 900), monolith(39, 0)],
+    devices: [pad('anachroverter', 5, 2, 'ANACHROVERTER'), pad('anachroverter', 24, 15, 'ANACHROVERTER')],
+    buttons: [button(7, 6, 0), button(8, 6, 0), button(9, 6, 0), button(10, 6, 0), button(12, 6, 1), button(13, 6, 1), button(14, 6, 1), button(15, 6, 1), button(17, 6, 2), button(18, 6, 2), button(19, 6, 2), button(20, 6, 2), button(2, 6, 3)],
+    phase: [...phaseBlocks(0, 7, 15, 10, 15, true), ...phaseBlocks(1, 12, 15, 15, 15, true), ...phaseBlocks(2, 17, 15, 20, 15, true), ...phaseBlocks(1, 7, 6, 10, 6), ...phaseBlocks(2, 12, 6, 15, 6), ...phaseBlocks(3, 37, 15, 37, 15, true), ...phaseBlocks(3, 36, 15, 36, 15, true), ...phaseBlocks(3, 35, 15, 35, 15, true), ...phaseBlocks(3, 34, 15, 34, 15, true), ...phaseBlocks(3, 33, 15, 33, 15, true), ...phaseBlocks(3, 32, 15, 32, 15, true), ...phaseBlocks(3, 31, 15, 31, 15, true), ...phaseBlocks(3, 30, 15, 30, 15, true), ...phaseBlocks(3, 29, 15, 29, 15, true), ...phaseBlocks(3, 28, 15, 28, 15, true), ...phaseBlocks(3, 27, 15, 27, 15, true), ...phaseBlocks(3, 39, 9, 42, 9)],
+    hazards: [{ x: 20 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 16 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 1 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 2 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 3 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 4 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 5 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 6 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 0 * TILE, w: TILE, h: TILE }],
     springs: [],
-    exit: { x: 40.5 * TILE, y: 15 * TILE - 26, r: 22 },
+    exit: { x: 25.5 * TILE, y: 4 * TILE - 26, r: 22 },
   };
 }
 
