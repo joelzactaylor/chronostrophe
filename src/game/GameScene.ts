@@ -70,6 +70,99 @@ const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
 const COL_SPRING = 0x9be36a;
 
+/** Minimum area (px²) of real overlap with a drawn spike that counts as touching it. */
+const HAZARD_OVERLAP_MIN = 50;
+
+/** Absolute area of a polygon via the shoelace formula. */
+function polygonArea(pts: { x: number; y: number }[]): number {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return Math.abs(a) / 2;
+}
+
+/** Clips a subject polygon to the half-plane on one side of a vertical/horizontal edge. */
+function clipPlane(
+  pts: { x: number; y: number }[],
+  axis: 'x' | 'y',
+  edge: number,
+  keepGreater: boolean,
+): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  const inside = (p: { x: number; y: number }): boolean =>
+    axis === 'x' ? (keepGreater ? p.x >= edge : p.x <= edge) : keepGreater ? p.y >= edge : p.y <= edge;
+  for (let i = 0; i < pts.length; i++) {
+    const cur = pts[i];
+    const nxt = pts[(i + 1) % pts.length];
+    const curIn = inside(cur);
+    const nxtIn = inside(nxt);
+    if (curIn) out.push(cur);
+    if (curIn !== nxtIn) {
+      const t =
+        axis === 'x' ? (edge - cur.x) / (nxt.x - cur.x) : (edge - cur.y) / (nxt.y - cur.y);
+      out.push({ x: cur.x + t * (nxt.x - cur.x), y: cur.y + t * (nxt.y - cur.y) });
+    }
+  }
+  return out;
+}
+
+/** Area of overlap between a rect and a convex polygon, by clipping the polygon to the rect. */
+function rectPolygonOverlap(r: Rect, poly: { x: number; y: number }[]): number {
+  let clipped = poly;
+  clipped = clipPlane(clipped, 'x', r.x, true);
+  clipped = clipPlane(clipped, 'x', r.x + r.w, false);
+  clipped = clipPlane(clipped, 'y', r.y, true);
+  clipped = clipPlane(clipped, 'y', r.y + r.h, false);
+  return polygonArea(clipped);
+}
+
+/**
+ * Total area (px²) of the player rect that overlaps the *drawn* spike image. The
+ * visible spike is a run of 10px-wide triangles plus a 3px solid base bar, mirroring
+ * drawHazards/drawHazardsInverted exactly: apex at the top for floor spikes, apex at
+ * the bottom for ceiling spikes.
+ */
+function hazardOverlapArea(pr: Rect, h: Rect, inverted: boolean): number {
+  let area = 0;
+  const spikes = Math.floor(h.w / 10);
+  for (let i = 0; i < spikes; i++) {
+    const x = h.x + i * 10;
+    const tri = inverted
+      ? [
+        { x, y: h.y },
+        { x: x + 5, y: h.y + h.h },
+        { x: x + 10, y: h.y },
+      ]
+      : [
+        { x, y: h.y + h.h },
+        { x: x + 5, y: h.y },
+        { x: x + 10, y: h.y + h.h },
+      ];
+    area += rectPolygonOverlap(pr, tri);
+  }
+  // The solid base bar, 3px thick.
+  area += rectPolygonOverlap(
+    pr,
+    inverted
+      ? [
+        { x: h.x, y: h.y },
+        { x: h.x + h.w, y: h.y },
+        { x: h.x + h.w, y: h.y + 3 },
+        { x: h.x, y: h.y + 3 },
+      ]
+      : [
+        { x: h.x, y: h.y + h.h - 3 },
+        { x: h.x + h.w, y: h.y + h.h - 3 },
+        { x: h.x + h.w, y: h.y + h.h },
+        { x: h.x, y: h.y + h.h },
+      ],
+  );
+  return area;
+}
+
 export const VIEW_W = 960;
 export const VIEW_H = 544;
 
@@ -251,7 +344,7 @@ export class GameScene extends Phaser.Scene {
     this.world.scrubTo(t);
     music.pauseLevel();
     music.seekLevel(t);
-}
+  }
 
   canScrub(): boolean {
     // Only the chronoporter repositions the world in time; the anachroverter
@@ -382,10 +475,10 @@ export class GameScene extends Phaser.Scene {
     // Being shoved further than your own width means something closed on you.
     if (world.crushed) return this.fail('death', 'CRUSHED');
     for (const h of this.level.hazards) {
-      if (rectsOverlap(pr, h)) return this.fail('death', 'KILLED BY HAZARD');
+      if (hazardOverlapArea(pr, h, false) >= HAZARD_OVERLAP_MIN) return this.fail('death', 'KILLED BY HAZARD');
     }
     for (const h of this.level.hazardsInverted) {
-      if (rectsOverlap(pr, h)) return this.fail('death', 'KILLED BY HAZARD');
+      if (hazardOverlapArea(pr, h, true) >= HAZARD_OVERLAP_MIN) return this.fail('death', 'KILLED BY HAZARD');
     }
     for (const box of world.boxes) {
       const br = boxRect(box);

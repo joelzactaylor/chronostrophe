@@ -1,10 +1,9 @@
-# Menu Music Fix - TODO
+# TODO — More tolerant hazard collisions
 
-- [x] Analyze the root cause (race condition: `playMenu()` called before `init()` finishes rendering)
-- [x] Get user approval on plan
-- [x] Edit `src/game/music.ts`:
-  - [x] Add `_initPromise` field to track pending initialization
-  - [x] Modify `init()` to store and return the promise (prevent duplicate concurrent renders)
-  - [x] Modify `playMenu()` to await `init()` if buffer not ready
-  - [x] Modify `playLevel()` to await `init()` if buffer not ready
-- [x] Verify compilation with `npx tsc --noEmit`
+Make hazard/spike collisions require at least 10px² overlap with the actual drawn spike image.
+
+- [x] Step 0: Understand current hazard collision & rendering (GameScene.ts)
+- [x] Step 1: Draft plan and get user confirmation
+- [x] Step 2: Add precise geometry helpers (polygonArea, clipPlane, rectPolygonOverlap, hazardOverlapArea) in GameScene.ts
+- [x] Step 3: Replace rectsOverlap hazard checks in tickBody with >=1px overlap test
+- [x] Step 4: Verify build/typecheck (typecheck + lint both pass)
