@@ -1408,6 +1408,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildFreefalling,
 ];
 
+
 export function buildLevel(index = 0): LevelDef {
   return LEVELS[clamp(Math.round(index), 0, LEVELS.length - 1)]();
 }
