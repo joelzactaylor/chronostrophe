@@ -1349,6 +1349,29 @@ function buildFreefalling(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildVacillating(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Vacillating',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [monolith(17, 510)],
+    devices: [pad('anachroverter', 36, 15, 'ANACHROVERTER'), pad('chronoporter', 11, 15, 'CHRONOPORTER')],
+    buttons: [button(7, 15, 2)],
+    phase: [...phaseBlocks(2, 21, 13, 25, 13, true), ...phaseBlocks(2, 21, 2, 25, 2, true), ...phaseBlocks(2, 21, 8, 21, 8, true), ...phaseBlocks(2, 20, 8, 20, 8, true), ...phaseBlocks(2, 19, 8, 19, 8, true), ...phaseBlocks(2, 18, 8, 18, 8, true), ...phaseBlocks(2, 17, 8, 17, 8, true), ...phaseBlocks(2, 16, 8, 16, 8, true)],
+    hazards: [],
+    hazardsInverted: [{ x: 1 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 2 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 3 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 4 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 5 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 6 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 28 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 32 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 34 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 36 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 38 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 39 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 40 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 41 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 42 * TILE, y: 0 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 27.5 * TILE, y: 6 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1369,6 +1392,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildSwitchback,
   buildPatience,
   buildDrop,
+  buildVacillating,
   buildWedge,
   buildInterception,
   buildPrecognition,
