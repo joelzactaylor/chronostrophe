@@ -1371,6 +1371,41 @@ function buildVacillating(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildEnfilade(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 7, 12, 9, 12);
+  fill(grid, 14, 12, 16, 12);
+  fill(grid, 21, 12, 23, 12);
+  fill(grid, 28, 12, 30, 12);
+  fill(grid, 7, 13, 8, 13);
+  fill(grid, 15, 13, 15, 13);
+  fill(grid, 22, 13, 22, 13);
+  fill(grid, 29, 13, 30, 13);
+  fill(grid, 7, 14, 8, 14);
+  fill(grid, 15, 14, 15, 14);
+  fill(grid, 22, 14, 22, 14);
+  fill(grid, 29, 14, 30, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Enfilade',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [],
+    devices: [pad('chronoporter', 35, 15, 'CHRONOPORTER')],
+    buttons: [button(10, 15, 1), button(17, 15, 2), button(24, 15, 3), button(38, 15, 0)],
+    phase: [...phaseBlocks(0, 10, 12, 13, 12), ...phaseBlocks(1, 17, 12, 20, 12), ...phaseBlocks(2, 24, 12, 27, 12), ...phaseBlocks(3, 42, 13, 42, 13, true), ...phaseBlocks(3, 42, 11, 42, 11, true), ...phaseBlocks(3, 42, 9, 42, 9, true), ...phaseBlocks(3, 42, 7, 42, 7, true)],
+    hazards: [],
+    hazardsInverted: [],
+    springs: [spring(5, 15), spring(12, 15), spring(19, 15), spring(26, 15), spring(32, 15)],
+    exit: { x: 40.5 * TILE, y: 6 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1392,6 +1427,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildPatience,
   buildDrop,
   buildVacillating,
+  buildEnfilade,
   buildWedge,
   buildInterception,
   buildPrecognition,
