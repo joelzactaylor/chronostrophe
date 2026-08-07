@@ -1406,6 +1406,77 @@ function buildEnfilade(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildLatch(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 16, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 15); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
+  fill(grid, 26, 2, 26, 2);
+  fill(grid, 26, 3, 26, 3);
+  fill(grid, 26, 4, 26, 4);
+  fill(grid, 31, 4, 34, 4);
+  fill(grid, 36, 4, 36, 4);
+  fill(grid, 40, 4, 40, 4);
+  fill(grid, 26, 5, 26, 5);
+  fill(grid, 31, 5, 31, 5);
+  fill(grid, 34, 5, 34, 5);
+  fill(grid, 26, 6, 26, 6);
+  fill(grid, 30, 6, 31, 6);
+  fill(grid, 34, 6, 34, 6);
+  fill(grid, 36, 6, 36, 6);
+  fill(grid, 38, 6, 38, 6);
+  fill(grid, 11, 7, 13, 7);
+  fill(grid, 17, 7, 23, 7);
+  fill(grid, 26, 7, 26, 7);
+  fill(grid, 31, 7, 31, 7);
+  fill(grid, 34, 7, 34, 7);
+  fill(grid, 11, 8, 11, 8);
+  fill(grid, 26, 8, 26, 8);
+  fill(grid, 30, 8, 31, 8);
+  fill(grid, 34, 8, 34, 8);
+  fill(grid, 40, 8, 40, 8);
+  fill(grid, 42, 8, 42, 8);
+  fill(grid, 10, 9, 11, 9);
+  fill(grid, 19, 9, 26, 9);
+  fill(grid, 31, 9, 31, 9);
+  fill(grid, 11, 10, 11, 10);
+  fill(grid, 26, 10, 26, 10);
+  fill(grid, 30, 10, 31, 10);
+  fill(grid, 10, 11, 11, 11);
+  fill(grid, 17, 11, 23, 11);
+  fill(grid, 26, 11, 26, 11);
+  fill(grid, 31, 11, 31, 11);
+  fill(grid, 34, 11, 34, 11);
+  fill(grid, 11, 12, 11, 12);
+  fill(grid, 26, 12, 26, 12);
+  fill(grid, 30, 12, 31, 12);
+  fill(grid, 34, 12, 34, 12);
+  fill(grid, 10, 13, 11, 13);
+  fill(grid, 20, 13, 26, 13);
+  fill(grid, 30, 13, 30, 13);
+  fill(grid, 34, 13, 34, 13);
+  fill(grid, 11, 14, 11, 14);
+  fill(grid, 30, 14, 30, 14);
+  fill(grid, 34, 14, 34, 14);
+  fill(grid, 1, 15, 34, 15);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Latch',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 21 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 36 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }, { x: 38 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }, { x: 40 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }, { x: 42 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }],
+    devices: [],
+    buttons: [button(40, 4, 0), button(36, 6, 1), button(42, 8, 2), button(36, 16, 0), button(38, 16, 1), button(40, 16, 2), button(42, 16, 3), button(38, 6, 3), button(40, 8, 3), button(36, 4, 3)],
+    phase: [...phaseBlocks(0, 35, 4, 35, 4), ...phaseBlocks(0, 37, 4, 39, 4), ...phaseBlocks(0, 41, 4, 42, 4), ...phaseBlocks(1, 35, 6, 35, 6), ...phaseBlocks(1, 37, 6, 37, 6), ...phaseBlocks(1, 39, 6, 42, 6), ...phaseBlocks(2, 38, 8, 39, 8), ...phaseBlocks(2, 41, 8, 41, 8), ...phaseBlocks(2, 35, 8, 37, 8), ...phaseBlocks(3, 42, 11, 42, 11), ...phaseBlocks(3, 41, 11, 41, 11), ...phaseBlocks(3, 40, 11, 40, 11), ...phaseBlocks(3, 39, 11, 39, 11), ...phaseBlocks(3, 38, 11, 38, 11), ...phaseBlocks(3, 37, 11, 37, 11), ...phaseBlocks(3, 36, 11, 36, 11), ...phaseBlocks(3, 35, 11, 35, 11), ...phaseBlocks(3, 33, 11, 33, 11, true), ...phaseBlocks(3, 32, 11, 32, 11, true), ...phaseBlocks(0, 35, 14, 36, 14), ...phaseBlocks(1, 37, 14, 38, 14), ...phaseBlocks(2, 39, 14, 40, 14), ...phaseBlocks(3, 41, 14, 42, 14)],
+    hazards: [{ x: 12 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 32 * TILE, y: 5 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 5 * TILE, w: TILE, h: TILE }],
+    springs: [spring(13, 7)],
+    exit: { x: 32.5 * TILE, y: 15 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1427,6 +1498,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildPatience,
   buildDrop,
   buildVacillating,
+  buildLatch,
   buildEnfilade,
   buildWedge,
   buildInterception,
