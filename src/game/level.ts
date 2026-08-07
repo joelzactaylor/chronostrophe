@@ -1477,6 +1477,53 @@ function buildLatch(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildStepwise(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 15, COLS - 1, 16); // floor
+  fill(grid, 0, 0, 0, 14); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 14); // right wall
+  fill(grid, 14, 7, 14, 7);
+  fill(grid, 25, 7, 25, 7);
+  fill(grid, 36, 7, 36, 7);
+  fill(grid, 14, 8, 14, 8);
+  fill(grid, 25, 8, 25, 8);
+  fill(grid, 36, 8, 36, 8);
+  fill(grid, 14, 9, 14, 9);
+  fill(grid, 25, 9, 25, 9);
+  fill(grid, 36, 9, 36, 9);
+  fill(grid, 14, 10, 14, 10);
+  fill(grid, 25, 10, 25, 10);
+  fill(grid, 36, 10, 36, 10);
+  fill(grid, 14, 11, 14, 11);
+  fill(grid, 25, 11, 25, 11);
+  fill(grid, 36, 11, 36, 11);
+  fill(grid, 14, 12, 14, 12);
+  fill(grid, 25, 12, 25, 12);
+  fill(grid, 36, 12, 36, 12);
+  fill(grid, 14, 13, 14, 13);
+  fill(grid, 25, 13, 25, 13);
+  fill(grid, 36, 13, 36, 13);
+  fill(grid, 14, 14, 14, 14);
+  fill(grid, 25, 14, 25, 14);
+  fill(grid, 36, 14, 36, 14);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Stepwise',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [],
+    devices: [pad('chronoporter', 8, 15, 'CHRONOPORTER')],
+    buttons: [button(6, 15, 1)],
+    phase: [...phaseBlocks(1, 13, 13, 13, 13), ...phaseBlocks(1, 13, 11, 13, 11), ...phaseBlocks(1, 13, 9, 13, 9), ...phaseBlocks(1, 24, 13, 24, 13, true), ...phaseBlocks(1, 24, 11, 24, 11, true), ...phaseBlocks(1, 24, 9, 24, 9, true), ...phaseBlocks(1, 35, 13, 35, 13), ...phaseBlocks(1, 35, 11, 35, 11), ...phaseBlocks(1, 35, 9, 35, 9)],
+    hazards: [],
+    hazardsInverted: [],
+    springs: [],
+    exit: { x: 40.5 * TILE, y: 13 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1498,6 +1545,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildPatience,
   buildDrop,
   buildVacillating,
+  buildStepwise,
   buildLatch,
   buildEnfilade,
   buildWedge,
