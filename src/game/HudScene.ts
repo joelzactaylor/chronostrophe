@@ -209,6 +209,21 @@ export class HudScene extends Phaser.Scene {
       g.fillStyle(trackTick, 1).fillRect(x, TRACK_Y - 8, 1, 16);
     }
 
+    // Epoch boundary: the chronoclast cut the timeline off at epochStart, so the
+    // stretch before it no longer exists. Mirror the beginning/end markers with a
+    // boundary tick at the cut, and dim the erased region so it reads as gone.
+    if (w.epochStart > 0) {
+      const ex = TRACK_X + (w.epochStart / TICKS) * TRACK_W;
+      const pulse = 0.35 + 0.25 * Math.sin(this.time.now / 220);
+      // The erased past: a dark hatch over the track, so nothing reads as playable.
+      g.fillStyle(trackBg, 0.75).fillRect(TRACK_X, TRACK_Y - 12, Math.max(2, ex - TRACK_X), 24);
+      g.lineStyle(1, trackEnd, 0.5);
+      for (let x = TRACK_X; x < ex; x += 8) g.lineBetween(x, TRACK_Y - 12, x + 4, TRACK_Y + 12);
+      // The boundary marker, styled like the track's own beginning/end ticks.
+      g.fillStyle(trackEnd, 0.9).fillRect(ex - 1, TRACK_Y - 12, 3, 24);
+      g.fillStyle(trackEnd, 0.18 + 0.2 * pulse).fillRect(ex - 6, TRACK_Y - 16, 13, 32);
+    }
+
     // recorded history coverage (drawn on top of the track)
     for (const run of w.runs) {
       const a = TRACK_X + (run.tMin / TICKS) * TRACK_W;

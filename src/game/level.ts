@@ -746,7 +746,7 @@ function buildInterception(): LevelDef {
   fill(grid, COLS - 1, 0, COLS - 1, 16); // right wall
   fill(grid, 18, 6, 18, 6);
   fill(grid, 26, 6, 26, 6);
-  fill(grid, 12, 7, 26, 7);
+  fill(grid, 14, 7, 26, 7);
   fill(grid, 24, 12, 24, 12);
   fill(grid, 12, 13, 12, 13);
   fill(grid, 1, 15, 7, 15);
@@ -762,7 +762,7 @@ function buildInterception(): LevelDef {
     boxes: [{ x: 22 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 14 * TILE, y: 7 * TILE - 28, w: 28, h: 28 }, { x: 9 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, { x: 11 * TILE, y: 13 * TILE - 28, w: 28, h: 28 }, monolith(8, 420)],
     devices: [pad('chronoporter', 16, 7, 'CHRONOPORTER')],
     buttons: [button(20, 7, 0), button(24, 7, 1)],
-    phase: [...phaseBlocks(0, 15, 13, 22, 13, true), ...phaseBlocks(0, 8, 7, 11, 7, true), ...phaseBlocks(0, 13, 13, 14, 13, true), ...phaseBlocks(1, 11, 13, 11, 13), ...phaseBlocks(1, 10, 13, 10, 13), ...phaseBlocks(1, 9, 13, 9, 13), ...phaseBlocks(1, 8, 13, 8, 13), ...phaseBlocks(1, 8, 15, 11, 15)],
+    phase: [...phaseBlocks(0, 15, 13, 22, 13, true), ...phaseBlocks(0, 8, 7, 13, 7, true), ...phaseBlocks(0, 13, 13, 14, 13, true), ...phaseBlocks(1, 11, 13, 11, 13), ...phaseBlocks(1, 10, 13, 10, 13), ...phaseBlocks(1, 9, 13, 9, 13), ...phaseBlocks(1, 8, 13, 8, 13), ...phaseBlocks(1, 8, 15, 11, 15)],
     hazards: [{ x: 17 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 14 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
     hazardsInverted: [],
     springs: [spring(14, 15)],
@@ -954,9 +954,8 @@ function buildDissolution(): LevelDef {
   fill(grid, 0, 16, COLS - 1, 16); // floor
   fill(grid, 0, 0, 0, 15); // left wall
   fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
-  fill(grid, 1, 2, 13, 2);
-  fill(grid, 18, 2, 42, 2);
-  fill(grid, 36, 3, 36, 3);
+  fill(grid, 1, 1, 13, 1);
+  fill(grid, 18, 1, 42, 1);
   fill(grid, 36, 4, 36, 4);
   fill(grid, 36, 5, 36, 5);
   fill(grid, 36, 6, 36, 6);
@@ -996,10 +995,10 @@ function buildDissolution(): LevelDef {
     name: 'Dissolution',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [{ x: 16 * TILE, y: 2 * TILE - 28, w: 28, h: 28 }],
+    boxes: [{ x: 16 * TILE, y: 1 * TILE - 28, w: 28, h: 28 }],
     devices: [pad('chronoporter', 26, 11, 'CHRONOPORTER'), pad('chronoclast', 32, 11, 'CHRONOCLAST')],
     buttons: [button(29, 11, 0)],
-    phase: [...phaseBlocks(0, 15, 2, 17, 2), ...phaseBlocks(0, 20, 7, 23, 7), ...phaseBlocks(0, 14, 2, 14, 2), ...phaseBlocks(0, 19, 7, 19, 7)],
+    phase: [...phaseBlocks(0, 15, 1, 17, 1), ...phaseBlocks(0, 20, 7, 23, 7), ...phaseBlocks(0, 14, 1, 14, 1), ...phaseBlocks(0, 19, 7, 19, 7)],
     hazards: [{ x: 18 * TILE, y: 6 * TILE, w: TILE, h: TILE }],
     hazardsInverted: [{ x: 15 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 10 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 12 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 13 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 14 * TILE, w: TILE, h: TILE }],
     springs: [],

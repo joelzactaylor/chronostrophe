@@ -512,21 +512,24 @@ export class GameScene extends Phaser.Scene {
     if (found?.kind === 'chronoclast') {
       if (this.lastClast !== found) {
         this.lastClast = found;
-        world.erasePlayerHistory();
+        world.chronoclast();
         this.anomalies = [];
         this.livedPath = [];
         this.paradoxGrace = PARADOX_GRACE;
-        this.message = 'CHRONOCLAST — RECORDED HISTORY ERASED';
+        this.message = 'CHRONOCLAST — RECORDED HISTORY DESTROYED';
       }
     } else {
       this.lastClast = null;
     }
 
-    const pausing = found?.kind === 'chronoporter' || found?.kind === 'anachroverter';
+    const pausing =
+      found?.kind === 'chronoporter' || found?.kind === 'anachroverter' || found?.kind === 'chronoclast';
     if (pausing && this.activeDevice !== found) {
       this.activeDevice = found;
       world.paused = true;
-      this.message = '';
+      // The chronoclast's own announcement is what the player should read; do not
+      // wipe it the way a fresh chronoporter/anachroverter cue would.
+      if (found.kind !== 'chronoclast') this.message = '';
       sfx.device();
     } else if (!pausing && this.activeDevice) {
       // Stepping off a pausing pad always closes the recording segment: the body

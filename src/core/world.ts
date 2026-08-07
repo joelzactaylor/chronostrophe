@@ -83,7 +83,8 @@ export interface Box {
   h: number;
   state: BoxState;
   initial: BoxState;
-  record: BoxState[];
+  /** Per-tick recorded states; gaps are possible (unrecorded ticks stay undefined). */
+  record: (BoxState | undefined)[];
   recordedMax: number;
   immovable: boolean;
   releaseTick: number;
@@ -135,6 +136,12 @@ export class World {
   player: PlayerState;
   now = 0;
   dir: 1 | -1 = 1;
+  /**
+   * The first tick of the current timeline epoch. The chronoclast raises it to
+   * the tick it fires, making everything before it unreachable: scrubbing and
+   * rewinding clamp to it, and no pre-boundary crate or player history is read.
+   */
+  epochStart = 0;
   paused = false;
   /**
    * Set when resolving the live body took more than its own width to undo, which
@@ -163,6 +170,15 @@ export class World {
   readonly phase: PhaseSpec[];
   /** The groups whose button is held down as the world stands right now. */
   pressed = new Set<number>();
+  /**
+   * What every phase block looked like at each recorded tick, as a 2D array
+   * indexed `[tick][phaseIndex]`. The becoming-solid delay leaves a phase block
+   * passable for a window that is not derivable from the button state alone, so
+   * it has to be remembered like any other recorded fact: reversing time retraces
+   * the transient passability, a ghost crossing it then does not read as having
+   * walked through a wall, and no false anomaly is created.
+   */
+  private readonly phaseSolidityHistory: (boolean[] | undefined)[] = new Array(TICKS + 1);
 
   constructor(
     map: TileMap,
@@ -181,7 +197,7 @@ export class World {
     this.deviceSolids = devices.map((r) => ({ ...r, id: DEVICE_SOLID }));
     boxes.forEach((b, i) => {
       const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0 };
-      const record: BoxState[] = new Array(TICKS + 1);
+      const record: (BoxState | undefined)[] = new Array(TICKS + 1);
       record[0] = { ...initial };
       this.boxes.push({
         id: i,
@@ -208,6 +224,7 @@ export class World {
     this.recordPlayer();
     this.updateButtons();
     this.updatePhaseSolids();
+    this.recordPhaseSolidity(0);
   }
 
   /**
@@ -273,6 +290,31 @@ export class World {
     return this.phase.filter((p) => this.isSolidPhase(p)).map((p) => ({ ...p.rect, id: PHASE_SOLID }));
   }
 
+  /**
+   * Snapshots each phase block's effective solidity into `phaseSolidityHistory`
+   * for the given tick, so the becoming-solid delay leaves a trace that reverse
+   * playback and scrubbing can retrace.
+   */
+  private recordPhaseSolidity(tick: number): void {
+    const t = clamp(tick, 0, TICKS);
+    this.phaseSolidityHistory[t] = this.phase.map((p) => this.isSolidPhase(p));
+  }
+
+  /**
+   * Restores every phase block to the solidity it had at the given recorded tick.
+   * Called when the timeline moves to a point whose state is already known, so the
+   * transient passability of a becoming-solid delay is reproduced exactly — a ghost
+   * that crossed a block while it was waiting to solidify is not judged to have
+   * walked through a wall.
+   */
+  private restorePhaseSolidity(tick: number): void {
+    const t = clamp(tick, 0, TICKS);
+    const snapshot = this.phaseSolidityHistory[t];
+    if (snapshot) {
+      for (let i = 0; i < this.phase.length; i++) this.phase[i]._solid = snapshot[i];
+    }
+  }
+
   private newRun(): Run {
     return {
       id: this.nextRunId++,
@@ -300,24 +342,84 @@ export class World {
     this.runs = this.runs.filter((r) => r !== run);
   }
 
-  /** Chronoclast: erase all recorded player history. */
-  erasePlayerHistory(): void {
+  /**
+     * Chronoclast: a hard causal boundary in the timeline. Everything before the
+     * instant it fires is cut off — the player's runs die with it, and so does every
+     * movable crate's recorded history. Each movable crate keeps its current position
+     * and the velocity it is actually experiencing *right now* as the first state of
+     * a brand-new timeline epoch, which then always runs forward.
+     *
+     * Reverse-time activation is asymmetric on purpose: the crates' records store
+     * forward-time velocity, and reversing time plays them back by grafting those
+     * forward states onto the body, so the crate's *visible* reverse movement is the
+     * negation of its stored velocity. When the chronoclast fires during rewinding we
+     * recover that effective reverse-playback velocity (negate the stored vx/vy), make
+     * it the crate's initial velocity, and let the new forward epoch continue from
+     * there — so a crate caught mid-rise keeps rising and crests under gravity.
+     *
+     * Monoliths (immovable boxes) are left completely untouched: not reset, not
+     * repositioned, and their records are not cleared.
+     */
+  chronoclast(): void {
+    const reversing = this.dir === -1;
+    // The new epoch begins at this tick and always runs forward.
+    this.epochStart = this.now;
+    this.dir = 1;
+
+    for (const box of this.boxes) {
+      // A monolith is part of the fixed world, not history the chronoclast may shed.
+      if (box.immovable) continue;
+      // Capture the crate's current *displayed* pose and the velocity it is
+      // actually experiencing at this instant. Under reverse playback the stored
+      // forward velocity is negated to get the visible backward motion; that
+      // effective velocity is what the new forward epoch must inherit.
+      const captured: BoxState = {
+        x: box.state.x,
+        y: box.state.y,
+        vx: reversing ? -box.state.vx : box.state.vx,
+        vy: reversing ? -box.state.vy : box.state.vy,
+      };
+      // Write the effective velocity back so forward physics continues from the
+      // crate's actual motion (a crate caught rising keeps its upward velocity).
+      box.state.vx = captured.vx;
+      box.state.vy = captured.vy;
+      // Erase the old record: the preserved arrangement is the epoch's initial
+      // condition, and no pre-boundary history may be read again.
+      box.record.fill(undefined);
+      box.recordedMax = this.now;
+      box.record[this.now] = { ...captured };
+    }
+
+    // Erase all player history; the live body stays put, with its current state
+    // recorded as the first step of the new epoch.
     this.runs = [];
     this.current = this.newRun();
     this.recordPlayer();
     this.updateButtons();
     this.updatePhaseSolids();
+    // The phase blocks' solidity history dies with the timeline it was part of:
+    // the blocks go back to their state as the world stands, and the record
+    // refills from the current tick forward.
+    this.phaseSolidityHistory.fill(undefined);
+    this.recordPhaseSolidity(this.now);
   }
 
   boxStateAt(box: Box, t: number): BoxState {
-    const idx = clamp(t, 0, box.recordedMax);
+    // Never reach below the epoch boundary: the chronoclast cut the timeline
+    // off there, so a movable crate must not be able to revert to its level
+    // initial state or any pre-boundary record.
+    const lo = this.epochStart;
+    const idx = clamp(t, lo, box.recordedMax);
     // Scrub or simulation may have skipped ticks that were never recorded (e.g.
     // after the chronoporter skipped forward past recordedMax).  Walk backwards
     // to the last known state rather than jumping to the starting position.
-    for (let i = idx; i >= 0; i--) {
+    for (let i = idx; i >= lo; i--) {
       const s = box.record[i];
       if (s) return s;
     }
+    // The epoch boundary is recorded, but if the box is a monolith (whose records
+    // the chronoclast leaves at tick 0) or lookups are somehow earlier, fall back
+    // to the initial state — monoliths are fixed world, not erasable history.
     return box.initial;
   }
 
@@ -358,19 +460,67 @@ export class World {
   }
 
   atTimeBound(): boolean {
-    return this.now <= 0 || this.now >= TICKS;
+    // The chronoclast cut the timeline at epochStart, so the beginning of the
+    // current epoch is a boundary too — reaching it is reaching the beginning
+    // of the reachable timeline.
+    return this.now <= this.epochStart || this.now >= TICKS;
   }
 
-  /** Repositions the world (and its objects) onto another point of the timeline. */
+  /**
+     * Repositions the world (and its objects) onto another point of the timeline.
+     *
+     * Scrubbing *backward* (or onto a point the objects have not moved past)
+     * teleports each box to its recorded state. Scrubbing *forward* always
+     * extrapolates the objects tick by tick through the skipped stretch — whether
+     * that stretch is new, unrecorded time or time already simulated — so a
+     * suspended monolith falls and a crate rolls exactly as they would have if
+     * global time had run at whatever rate the scrub demanded, rather than
+     * teleporting to a recorded mid-motion pose.
+     */
   scrubTo(t: number): void {
-    this.now = clamp(Math.round(t), 0, TICKS);
-    for (const box of this.boxes) {
-      const s = this.boxStateAt(box, this.now);
-      box.state = { ...s };
+    // The chronoclast made epochStart the beginning of reachable time: the player
+    // cannot scrub back before it, only forward from it.
+    const target = clamp(Math.round(t), this.epochStart, TICKS);
+    if (target > this.now) {
+      // Forward: simulate the objects through every skipped tick, recorded or not.
+      this.simulateBoxesTo(target);
+    } else {
+      // A known point of the timeline: place each object at its recorded state.
+      this.now = target;
+      for (const box of this.boxes) {
+        const s = this.boxStateAt(box, this.now);
+        box.state = { ...s };
+      }
+      // Restore what the phase blocks looked like at this tick so the view and
+      // the paradox judgement match history (including transient passability).
+      this.restorePhaseSolidity(target);
     }
     this.updateButtons();
     this.updatePhaseSolids();
     this.player.groundedOn = supportUnder(playerRect(this.player), this.map, this.solids());
+  }
+
+  /**
+   * Advances the objects forward through as many ticks as a forward scrub skips,
+   * one at a time, so that scrubbing into unrecorded time behaves exactly as
+   * though global time had run at whatever rate the scrub demanded.
+   *
+   * The live body is deliberately not part of this pass: while the player scrubs
+   * they stand on the chronoporter, whose volume objects cannot enter, so the
+   * objects react only to recorded ghost history, gravity, springs, and one
+   * another — never to the idle player (or a monolith, which the level designer
+   * never hangs over a pad).
+   */
+  private simulateBoxesTo(target: number): void {
+    const start = this.now;
+    for (let t = start; t < target; t++) {
+      this.now = t;
+      this.stepBoxesForward(t + 1);
+      // Keep the phase solidity record in step with the simulated boxes so a
+      // later reversal through this stretch reproduces the same blocks.
+      this.recordPhaseSolidity(t + 1);
+    }
+    this.now = target;
   }
 
   private recordPlayer(): void {
@@ -386,7 +536,15 @@ export class World {
     this.updatePhaseSolids();
     // Clear any previous tick's spring firing; this tick's springs will set it.
     this.sprungOn = null;
-    const target = clamp(this.now + this.dir, 0, TICKS);
+    // When time runs backward, the phase blocks must retrace the exact solidity
+    // they had going forward: the becoming-solid delay left them passable for a
+    // window, and restoring that from history keeps a ghost from reading as having
+    // walked through a wall. Restore before the body moves so the transient
+    // passability is in effect for the tick being retraced.
+    if (this.dir === -1) this.restorePhaseSolidity(this.now);
+    // Clamp to the epoch bounds: the chronoclast cut the timeline at epochStart, so
+    // rewinding stops there and never reaches pre-chronoclast time.
+    const target = clamp(this.now + this.dir, this.epochStart, TICKS);
     const beforeBoxes = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
 
     let ghostHandled = new Set<number>();
@@ -417,6 +575,10 @@ export class World {
     this.carryBoxesBySupport(beforeBoxesPlayerStep, beforePlayerStep, { x: this.player.x, y: this.player.y });
     this.now = target;
     this.recordPlayer();
+    // Going forward, remember the solidity each phase block ended the tick with,
+    // so that reversing back through here can reproduce it (including the delay
+    // window during which a block was passable despite wanting to be solid).
+    if (this.dir === 1) this.recordPhaseSolidity(target);
   }
 
   /**
@@ -634,7 +796,14 @@ export class World {
     const claimed = new Set<number>();
     const carried = new Set<number>();
     this.ghostPushedIds.clear();
-    for (const run of this.runs) {
+    // While time is paused on a device, the live body's current run is also
+    // history: it is shown as a ghost and its solids the boxes, so a forward
+    // re-simulation through already-recorded time must retrace its shoves and
+    // carries exactly as it retraces the completed runs'. Otherwise a crate that
+    // was shoved during the current run would just fall, desyncing from the path
+    // it recorded.
+    const runs = this.paused ? [...this.runs, this.current] : this.runs;
+    for (const run of runs) {
       const prev = run.states[this.now];
       const next = run.states[target];
       if (!prev || !next) continue;
