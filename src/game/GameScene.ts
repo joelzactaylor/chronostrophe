@@ -219,6 +219,7 @@ export class GameScene extends Phaser.Scene {
       this.level.buttons ?? [],
       this.level.phase ?? [],
       this.level.springs ?? [],
+      this.matter.world,
     );
     this.state = 'play';
     this.message = '';

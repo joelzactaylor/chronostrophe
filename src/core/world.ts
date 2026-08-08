@@ -1,4 +1,6 @@
+import type Phaser from 'phaser';
 import { SolidRect, TileMap, depenetrate, moveX, moveY, supportUnder } from './physics';
+import { CrateWorld } from './cratePhysics';
 import {
   BoxState,
   DEVICE_SOLID,
@@ -26,7 +28,7 @@ export const JUMP_CUT = 0.42;
 export const COYOTE_TICKS = 6;
 export const BUFFER_TICKS = 7;
 export const PLAYER_W = 20;
-export const PLAYER_H = 28;
+export const PLAYER_H = 26;
 export const PLAYER_DUCK_H = 16;
 export const BOX_PUSH_SPEED = 130;
 /**
@@ -130,6 +132,7 @@ export function boxRect(b: Box): Rect {
 
 export class World {
   readonly map: TileMap;
+  readonly crates: CrateWorld;
   readonly boxes: Box[] = [];
   runs: Run[] = [];
   current: Run;
@@ -188,6 +191,7 @@ export class World {
     buttons: ButtonSpec[] = [],
     phase: PhaseSpec[] = [],
     springs: Rect[] = [],
+    matterWorld: Phaser.Physics.Matter.World,
   ) {
     this.map = map;
     this.spawn = spawn;
@@ -195,6 +199,8 @@ export class World {
     this.buttons = buttons;
     this.phase = phase;
     this.deviceSolids = devices.map((r) => ({ ...r, id: DEVICE_SOLID }));
+    if (!matterWorld) throw new Error('World requires a Phaser Matter world');
+    this.crates = new CrateWorld(map, devices, springs, matterWorld);
     boxes.forEach((b, i) => {
       const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0 };
       const record: (BoxState | undefined)[] = new Array(TICKS + 1);

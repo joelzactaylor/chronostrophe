@@ -20,6 +20,13 @@ const game = new Phaser.Game({
   backgroundColor: bgHex,
   pixelArt: true,
   roundPixels: true,
+  physics: {
+    default: 'matter',
+    matter: {
+      gravity: { x: 0, y: 0 },
+      autoUpdate: false,
+    },
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
