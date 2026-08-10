@@ -56,6 +56,7 @@ const EPS = 0.02;
  * deliberately generous: only a body with nothing beneath it is standing on nothing.
  */
 const GHOST_SUPPORT_PROBE = 24;
+const GHOST_FLOATING_EPSILON = 0.5;
 
 export interface Input {
   left: boolean;
@@ -1016,6 +1017,28 @@ export class World {
         : supportUnder(rect, this.map, this.solids());
   }
 
+  private ghostIsFloatingUnsupported(run: Run, tick: number): boolean {
+    if (tick < 2) return false;
+    const samples: PlayerState[] = [];
+    for (let t = tick; t >= tick - 2; t--) {
+      const s = run.states[t];
+      if (!s) return false;
+      samples.push(s);
+    }
+    if (samples.length < 3) return false;
+    const unsupported = samples.every((s) => {
+      const r = playerRect(s);
+      return supportUnder(r, this.map, this.solids()) === GROUND_NONE;
+    });
+    if (!unsupported) return false;
+    for (let i = 1; i < samples.length; i++) {
+      const prev = samples[i - 1];
+      const curr = samples[i];
+      if (Math.abs(curr.y - prev.y) >= GHOST_FLOATING_EPSILON) return false;
+    }
+    return true;
+  }
+
   /** The player is weightless but can shove live boxes sideways. */
   private pushBox(box: Box, dirSign: number, playerRectAfter: Rect): void {
     if (!box || dirSign === 0 || box.immovable) return;
@@ -1054,16 +1077,11 @@ export class World {
         }
       }
 
-      // A recorded body stood on a crate that is no longer under it. It cannot be
-      // standing on air, so the history that put it there is void. Tile support is
-      // never in question: level geometry does not move. Crates that are still in
-      // direct contact with the ghost are treated as part of the ghost's carried
-      // support chain and are not flagged as a contradiction.
-      if (state.groundedOn >= 0) {
-        const support = this.boxes[state.groundedOn];
-        if (support && !this.holdsUp(support, g) && !this.boxRidesGhostChain(support, g)) {
-          return { run, tick: this.now, reason: 'a former self is standing on nothing', x: g.x, y: g.y };
-        }
+      // A former self floating unsupported for three consecutive frames with
+      // essentially no y movement is impossible history: it is not standing,
+      // not falling, and not supported by anything the world can produce.
+      if (this.ghostIsFloatingUnsupported(run, this.now)) {
+        return { run, tick: this.now, reason: 'a former self is floating unsupported', x: g.x, y: g.y };
       }
 
       for (const box of this.boxes) {
@@ -1099,12 +1117,6 @@ export class World {
       }
     }
     return null;
-  }
-
-  /** True when the box is still beneath the rect, close enough to be holding it up. */
-  private holdsUp(box: Box, r: Rect): boolean {
-    const probe: Rect = { x: r.x, y: r.y + r.h - 2, w: r.w, h: GHOST_SUPPORT_PROBE + 2 };
-    return rectsOverlap(probe, boxRect(box));
   }
 
   respawnPlayerAtSpawn(): void {
