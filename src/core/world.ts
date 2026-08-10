@@ -56,7 +56,7 @@ const EPS = 0.02;
  * deliberately generous: only a body with nothing beneath it is standing on nothing.
  */
 const GHOST_SUPPORT_PROBE = 24;
-const GHOST_FLOATING_EPSILON = 0.5;
+const GHOST_FLOATING_EPSILON = 0.05;
 
 export interface Input {
   left: boolean;
@@ -1017,6 +1017,30 @@ export class World {
         : supportUnder(rect, this.map, this.solids());
   }
 
+  private holdsUp(box: Box, r: Rect): boolean {
+    const probe: Rect = { x: r.x, y: r.y + r.h - 2, w: r.w, h: GHOST_SUPPORT_PROBE + 2 };
+    return rectsOverlap(probe, boxRect(box));
+  }
+
+  private ghostIsSupportedAt(s: PlayerState): boolean {
+    const r = playerRect(s);
+    switch (s.groundedOn) {
+      case GROUND_TILE:
+        return true;
+      case PHASE_SOLID: {
+        const probe: Rect = { x: r.x, y: r.y + r.h - 2, w: r.w, h: GHOST_SUPPORT_PROBE + 2 };
+        return this.phase.some((p) => this.isSolidPhase(p) && rectsOverlap(probe, p.rect));
+      }
+      default: {
+        if (s.groundedOn >= 0) {
+          const support = this.boxes[s.groundedOn];
+          if (support && (this.holdsUp(support, r) || this.boxRidesGhostChain(support, r))) return true;
+        }
+        return supportUnder(r, this.map, this.solids()) !== GROUND_NONE;
+      }
+    }
+  }
+
   private ghostIsFloatingUnsupported(run: Run, tick: number): boolean {
     if (tick < 2) return false;
     const samples: PlayerState[] = [];
@@ -1026,10 +1050,7 @@ export class World {
       samples.push(s);
     }
     if (samples.length < 3) return false;
-    const unsupported = samples.every((s) => {
-      const r = playerRect(s);
-      return supportUnder(r, this.map, this.solids()) === GROUND_NONE;
-    });
+    const unsupported = samples.every((s) => !this.ghostIsSupportedAt(s));
     if (!unsupported) return false;
     for (let i = 1; i < samples.length; i++) {
       const prev = samples[i - 1];
