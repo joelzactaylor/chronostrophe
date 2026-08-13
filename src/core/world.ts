@@ -131,6 +131,7 @@ export function boxRect(b: Box): Rect {
   return { x: b.state.x, y: b.state.y, w: b.w, h: b.h };
 }
 
+
 export class World {
   readonly map: TileMap;
   readonly crates: CrateWorld;
@@ -687,6 +688,18 @@ export class World {
       .concat(this.deviceSolids, this.phaseSolids(), this.springs);
   }
 
+  private boxIsFalling(box: Box): boolean {
+    if (box.state.vy > 0.001) return true;
+
+    return (
+      supportUnder(
+        boxRect(box),
+        this.map,
+        this.otherBoxSolids(box),
+      ) === GROUND_NONE
+    );
+  }
+
   private boxDirectlyRidesGhost(box: Box, ghostRect: Rect): boolean {
     const rect = boxRect(box);
     const overlapX = rect.x + 1 < ghostRect.x + ghostRect.w && rect.x + rect.w - 1 > ghostRect.x;
@@ -721,17 +734,34 @@ export class World {
    * The run of crates a shove travels through: the crate being shoved, then each
    * one it is already up against along the direction of the shove.
    */
-  private pushChain(box: Box, dx: number, dy: number): Box[] {
+  private pushChain(
+    box: Box,
+    dx: number,
+    dy: number,
+    excludedIds = new Set<number>(),
+  ): Box[] {
     const chain: Box[] = [];
     const seen = new Set<number>();
     let current: Box | null = box;
-    while (current && !seen.has(current.id) && !current.immovable) {
+    while (
+      current &&
+      !seen.has(current.id) &&
+      !current.immovable &&
+      !excludedIds.has(current.id)
+    ) {
       chain.push(current);
       seen.add(current.id);
 
       const currentRect = { x: current.state.x, y: current.state.y, w: current.w, h: current.h };
       const next = this.boxes.find((candidate): boolean => {
-        if (candidate === current || seen.has(candidate.id) || candidate.immovable) return false;
+        if (
+          candidate === current ||
+          seen.has(candidate.id) ||
+          candidate.immovable ||
+          excludedIds.has(candidate.id)
+        ) {
+          return false;
+        }
         const candidateRect = { x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h };
         if (dx !== 0) {
           const sameRow = Math.abs(candidateRect.y - currentRect.y) < 2;
@@ -803,6 +833,11 @@ export class World {
     const claimed = new Set<number>();
     const carried = new Set<number>();
     this.ghostPushedIds.clear();
+    const fallingIds = new Set(
+      this.boxes
+        .filter((box) => this.boxIsFalling(box))
+        .map((box) => box.id),
+    );
     // While time is paused on a device, the live body's current run is also
     // history: it is shown as a ghost and its solids the boxes, so a forward
     // re-simulation through already-recorded time must retrace its shoves and
@@ -823,6 +858,7 @@ export class World {
         // A monolith is not shoved or carried by anything, least of all a memory.
         if (box.immovable) continue;
         if (claimed.has(box.id) || target < box.releaseTick) continue;
+        if (fallingIds.has(box.id)) continue;
         const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         const others = this.otherBoxSolids(box);
         const riding = this.boxRidesGhostChain(box, pr);
@@ -834,7 +870,11 @@ export class World {
           box.state.x = rect.x;
           box.state.y = rect.y;
         } else if (rectsOverlap(nr, rect)) {
-          const chain = dx !== 0 ? this.pushChain(box, dx, 0) : dy < 0 ? this.pushChain(box, 0, dy) : [];
+          const chain = dx !== 0
+            ? this.pushChain(box, dx, 0, fallingIds)
+            : dy < 0
+              ? this.pushChain(box, 0, dy, fallingIds)
+              : [];
           if (chain.length > 0) {
             // A shoved crate travels at the crate push speed, whoever shoves it: the
             // live body moves it a whole push step and then stands flush behind it, so
@@ -856,8 +896,17 @@ export class World {
               this.ghostPushedIds.add(entry.id);
               claimed.add(entry.id);
             }
-            const ghostMoved = this.carryBoxesBySupport(beforeGhostSupport, { x: this.player.x, y: this.player.y }, { x: this.player.x, y: this.player.y }, new Set(chain.map((entry) => entry.id)));
-            for (const id of ghostMoved) {
+            const skipGhostSupport = new Set<number>([
+              ...fallingIds,
+              ...chain.map((entry) => entry.id),
+            ]);
+
+            const ghostMoved = this.carryBoxesBySupport(
+              beforeGhostSupport,
+              { x: this.player.x, y: this.player.y },
+              { x: this.player.x, y: this.player.y },
+              skipGhostSupport,
+            ); for (const id of ghostMoved) {
               this.ghostPushedIds.add(id);
               claimed.add(id);
             }
