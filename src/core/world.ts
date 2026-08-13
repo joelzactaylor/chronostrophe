@@ -614,7 +614,7 @@ export class World {
     const propagatedDeltas = new Map<number, { x: number; y: number }>();
 
     for (const box of orderedBoxes) {
-      if (box.immovable || skipIds.has(box.id)) continue;
+      if (box.immovable || skipIds.has(box.id) || this.boxIsFalling(box)) continue;
       const before = beforeBoxes[box.id];
       const rawDelta = before
         ? { x: box.state.x - before.x, y: box.state.y - before.y }
