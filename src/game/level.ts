@@ -703,7 +703,7 @@ function buildDrop(): LevelDef {
     name: 'Drop',
     map,
     spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
-    boxes: [{ x: 24 * TILE, y: 10 * TILE - 28, w: 28, h: 28 }, { x: 31 * TILE, y: 14 * TILE - 28, w: 28, h: 28 }],
+    boxes: [{ x: 24 * TILE, y: 10 * TILE - 28, w: 28, h: 28 }, { x: 31 * TILE, y: 15 * TILE - 28, w: 28, h: 28 }],
     devices: [pad('chronoporter', 11, 11, 'CHRONOPORTER')],
     buttons: [button(5, 15, 0), button(15, 16, 1)],
     phase: [...phaseBlocks(0, 14, 11, 21, 11), ...phaseBlocks(0, 13, 7, 13, 10, true), ...phaseBlocks(1, 22, 7, 22, 10, true), ...phaseBlocks(1, 20, 13, 26, 13, true)],

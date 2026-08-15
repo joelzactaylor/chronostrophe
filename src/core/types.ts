@@ -32,6 +32,18 @@ export interface PlayerState {
   ducking: boolean;
   /** GROUND_NONE, GROUND_TILE or the id of the box the body rests on. */
   groundedOn: number;
+  /**
+   * How far the body tried to travel sideways this tick, before anything stopped
+   * it.
+   *
+   * `x` is where the body ended up, which is flush against whatever it ran into —
+   * so a former self retracing those positions never overlaps the crate it spent
+   * the whole run shoving, and cannot tell the tick it made contact from the tick
+   * before. What it pushed, it pushed because it *tried* to walk into it; that
+   * intent is the part of the shove the resolved position throws away, so it is
+   * recorded too.
+   */
+  intentX: number;
 }
 
 export interface BoxState {

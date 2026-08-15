@@ -51,6 +51,23 @@ export const SPRING_H = 12;
 const EPS = 0.02;
 
 /**
+ * How far apart two objects have to be vertically before one counts as riding on
+ * the other rather than standing beside it. Crates in a row drift fractions of a
+ * pixel apart as they are shoved, and that must not decide which of them moves
+ * first.
+ */
+const ROW_TOLERANCE = 8;
+
+/**
+ * How far inside something the live body may be left, after being pushed out by
+ * the shortest way available, before it counts as having been crushed rather than
+ * merely leaned on. A crate shoved against the body by a former self grazes it by
+ * a fraction of a pixel and is resolved the same tick; a stone coming down has the
+ * body wholly inside it with nowhere to go.
+ */
+const CRUSH_DEPTH = 6;
+
+/**
  * How far below a recorded body its support may sit and still hold it up. A crate
  * carrying a ghost down a fall trails it by up to a tick of travel, so the probe is
  * deliberately generous: only a body with nothing beneath it is standing on nothing.
@@ -129,6 +146,13 @@ export function playerRect(s: { x: number; y: number; ducking: boolean }): Rect 
 
 export function boxRect(b: Box): Rect {
   return { x: b.state.x, y: b.state.y, w: b.w, h: b.h };
+}
+
+/** How far two rects are into one another: the shorter way out, or 0 if clear. */
+function overlapDepth(a: Rect, b: Rect): number {
+  const x = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const y = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return Math.max(0, Math.min(x, y));
 }
 
 
@@ -227,6 +251,7 @@ export class World {
       facing: 1,
       ducking: false,
       groundedOn: GROUND_NONE,
+      intentX: 0,
     };
     this.current = this.newRun();
     this.recordPlayer();
@@ -524,6 +549,7 @@ export class World {
     for (let t = start; t < target; t++) {
       this.now = t;
       this.stepBoxesForward(t + 1);
+      this.recordBoxes(t + 1);
       // Keep the phase solidity record in step with the simulated boxes so a
       // later reversal through this stretch reproduces the same blocks.
       this.recordPhaseSolidity(t + 1);
@@ -553,11 +579,19 @@ export class World {
     // Clamp to the epoch bounds: the chronoclast cut the timeline at epochStart, so
     // rewinding stops there and never reaches pre-chronoclast time.
     const target = clamp(this.now + this.dir, this.epochStart, TICKS);
-    const beforeBoxes = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
+    const beforeBoxes = this.boxPositions();
 
     let ghostHandled = new Set<number>();
-    if (this.dir === 1) ghostHandled = this.stepBoxesForward(target);
-    else for (const box of this.boxes) box.state = { ...this.boxStateAt(box, target) };
+    if (this.dir === 1) {
+      ghostHandled = this.stepBoxesForward(target);
+    } else {
+      for (const box of this.boxes) box.state = { ...this.boxStateAt(box, target) };
+      // A rewinding object is retracing its own worldline, and that worldline
+      // already contains everything that happened to it — the shove, the ride, the
+      // fall. Letting the carry pass add its support's movement on top counts the
+      // same motion twice and walks the object off its own recorded path.
+      ghostHandled = new Set(this.boxes.map((box) => box.id));
+    }
 
     const beforePlayerBoxCarry = { x: this.player.x, y: this.player.y };
 
@@ -572,15 +606,24 @@ export class World {
     }
 
     const afterPlayerBoxCarry = { x: this.player.x, y: this.player.y };
-    // Anything a recorded body already moved this tick is left alone: `beforeBoxes`
-    // predates that motion, so carrying it again by its support's delta would count
-    // the shove twice — once per layer of the stack.
-    this.carryBoxesBySupport(beforeBoxes, beforePlayerBoxCarry, afterPlayerBoxCarry, ghostHandled);
+    // Only the body has moved since the objects settled, so this pass carries what
+    // rides the body as the body is itself carried, and nothing else.
+    this.carryBoxesBySupport(this.boxPositions(), beforePlayerBoxCarry, afterPlayerBoxCarry, ghostHandled);
 
-    const beforeBoxesPlayerStep = this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
+    // The live body acts, and then what rides it follows — the same two steps the
+    // recorded bodies took above, in the same order, off their own snapshot.
+    const beforeBoxesPlayerStep = this.boxPositions();
     const beforePlayerStep = { x: this.player.x, y: this.player.y };
     this.stepPlayer(input);
-    this.carryBoxesBySupport(beforeBoxesPlayerStep, beforePlayerStep, { x: this.player.x, y: this.player.y });
+    this.carryBoxesBySupport(
+      beforeBoxesPlayerStep,
+      beforePlayerStep,
+      { x: this.player.x, y: this.player.y },
+      ghostHandled,
+    );
+    // Everything that was going to happen this tick has happened: the worldlines
+    // written now are the ones that were on screen.
+    if (this.dir === 1) this.recordBoxes(target);
     this.now = target;
     this.recordPlayer();
     // Going forward, remember the solidity each phase block ended the tick with,
@@ -610,11 +653,22 @@ export class World {
     const moved = new Set<number>();
     const playerDx = afterPlayer.x - beforePlayer.x;
     const playerDy = afterPlayer.y - beforePlayer.y;
-    const orderedBoxes = [...this.boxes].sort((b, a) => a.state.y - b.state.y || a.state.x - b.state.x);
+    // Supports before the things riding them, and along a row the far end first,
+    // so each crate has made its room before the one behind it is carried into it.
+    //
+    // Row order has to be read coarsely. Two crates side by side in the same row
+    // drift a fraction of a pixel apart vertically, and sorting on that exactly
+    // swaps them — the crate behind is then carried into a crate that has not
+    // moved yet, is stopped short, and the row it belongs to falls a whole push
+    // step behind the row underneath. That shear is what leaves a crate lapping
+    // its neighbour by a couple of pixels when its own support drops away.
+    const row = (box: Box): number => Math.round(box.state.y / ROW_TOLERANCE);
+    const orderedBoxes = [...this.boxes].sort((b, a) => row(a) - row(b) || a.state.x - b.state.x);
     const propagatedDeltas = new Map<number, { x: number; y: number }>();
+    const falling = this.fallingBoxIds();
 
     for (const box of orderedBoxes) {
-      if (box.immovable || skipIds.has(box.id) || this.boxIsFalling(box)) continue;
+      if (box.immovable || skipIds.has(box.id) || falling.has(box.id)) continue;
       const before = beforeBoxes[box.id];
       const rawDelta = before
         ? { x: box.state.x - before.x, y: box.state.y - before.y }
@@ -656,15 +710,21 @@ export class World {
       if (supportDx !== 0 || supportDy !== 0) {
         box.state.x += supportDx;
         box.state.y += supportDy;
+        const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         // Ensure the box isn't pushed into terrain or other solids by the
         // support movement.  This prevents a crate riding the player from
         // being carried through a wall when the player walks into one.
-        const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
+        // A crate on its way down is no part of the row it is leaving, so it does
+        // not hold up the one riding along behind it either. Letting it do so cost
+        // the carried row a whole push step every time a stack went over the edge:
+        // the two rows sheared apart, and a crate whose own support then dropped
+        // away was left lapping the next one along, hanging on that couple of
+        // pixels of contact in the way of everything still being pushed.
         const solids = this.boxes
-          .filter((o) => o !== box)
+          .filter((o) => o !== box && !falling.has(o.id))
           .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
           .concat(this.deviceSolids, this.phaseSolids(), this.springs);
-        depenetrate(rect, this.map, solids, 'both');
+        depenetrate(rect, this.map, solids);
         moveX(rect, 0, this.map, solids);
         moveY(rect, 0, this.map, solids);
         box.state.x = rect.x;
@@ -686,6 +746,11 @@ export class World {
       .filter((o) => o !== box)
       .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
       .concat(this.deviceSolids, this.phaseSolids(), this.springs);
+  }
+
+  /** Every crate currently on its way down, and so no part of any row. */
+  private fallingBoxIds(): Set<number> {
+    return new Set(this.boxes.filter((box) => this.boxIsFalling(box)).map((box) => box.id));
   }
 
   private boxIsFalling(box: Box): boolean {
@@ -727,6 +792,24 @@ export class World {
         return true;
       }
     }
+    return false;
+  }
+
+  /**
+   * Whether a body travelling `dx, dy` still has this object in front of it: the
+   * object's leading edge is further along the direction of travel than the body's
+   * own.
+   *
+   * A recorded body that has ended up inside an object it could not shift — the
+   * crates ahead of it jammed for a tick against one falling off a ledge, say — is
+   * not pushing it any more, it is standing in it, and a body reversing by a
+   * fraction of a pixel as it slows must not be read as shoving the crate it has
+   * just walked into back the way it came. Shoving is for what is in front.
+   */
+  private aheadOf(rect: Rect, body: Rect, dx: number, dy: number): boolean {
+    if (dx > 0) return rect.x + rect.w > body.x + body.w;
+    if (dx < 0) return rect.x < body.x;
+    if (dy < 0) return rect.y < body.y;
     return false;
   }
 
@@ -807,12 +890,19 @@ export class World {
    *
    * The live body and a recorded one both shove through here, which is what keeps
    * a replayed shove landing where the recorded one did.
+   *
+   * A crate in free fall is no part of the shove: it does not join the chain, and
+   * `ignoreIds` is how it also stops blocking one. A stack toppling off a ledge
+   * spends a few ticks straddling the row it just left, and letting it hold that
+   * whole row still leaves the body walking on into crates that cannot answer —
+   * which is the wedge every crate that ever left from behind a former self was
+   * squeezed out of.
    */
-  private shoveChain(chain: Box[], delta: number, axis: 'x' | 'y'): void {
+  private shoveChain(chain: Box[], delta: number, axis: 'x' | 'y', ignoreIds = new Set<number>()): void {
     for (let i = chain.length - 1; i >= 0; i--) {
       const entry = chain[i];
       const rect: Rect = { x: entry.state.x, y: entry.state.y, w: entry.w, h: entry.h };
-      const solids = this.otherBoxSolids(entry);
+      const solids = this.otherBoxSolids(entry).filter((s) => !ignoreIds.has(s.id));
       if (axis === 'x') moveX(rect, delta, this.map, solids);
       else moveY(rect, delta, this.map, solids);
       entry.state.x = rect.x;
@@ -833,11 +923,7 @@ export class World {
     const claimed = new Set<number>();
     const carried = new Set<number>();
     this.ghostPushedIds.clear();
-    const fallingIds = new Set(
-      this.boxes
-        .filter((box) => this.boxIsFalling(box))
-        .map((box) => box.id),
-    );
+    const fallingIds = this.fallingBoxIds();
     // While time is paused on a device, the live body's current run is also
     // history: it is shown as a ghost and its solids the boxes, so a forward
     // re-simulation through already-recorded time must retrace its shoves and
@@ -853,7 +939,14 @@ export class World {
       const nr = playerRect(next);
       const dx = nr.x - pr.x;
       const dy = nr.y - pr.y;
-      if (dx === 0 && dy === 0) continue;
+      // Where the body was trying to get to, which is not always where it got. A
+      // body leaning on a crate it cannot shift covers almost no ground, and reading
+      // the shove off the distance covered loses the tick it first made contact —
+      // the one tick that decides whether a crate goes over a ledge this side of
+      // gravity or the far side of it.
+      const intentX = next.intentX ?? dx;
+      const reachedFor: Rect = { x: pr.x + intentX, y: nr.y, w: nr.w, h: nr.h };
+      if (dx === 0 && dy === 0 && intentX === 0) continue;
       for (const box of this.boxes) {
         // A monolith is not shoved or carried by anything, least of all a memory.
         if (box.immovable) continue;
@@ -869,29 +962,26 @@ export class World {
           carried.add(box.id);
           box.state.x = rect.x;
           box.state.y = rect.y;
-        } else if (rectsOverlap(nr, rect)) {
-          const chain = dx !== 0
-            ? this.pushChain(box, dx, 0, fallingIds)
+        } else if (
+          (intentX !== 0 || dy < 0) &&
+          rectsOverlap(reachedFor, rect) &&
+          this.aheadOf(rect, reachedFor, intentX, dy)
+        ) {
+          const chain = intentX !== 0
+            ? this.pushChain(box, intentX, 0, fallingIds)
             : dy < 0
               ? this.pushChain(box, 0, dy, fallingIds)
               : [];
           if (chain.length > 0) {
-            // A shoved crate travels at the crate push speed, whoever shoves it: the
-            // live body moves it a whole push step and then stands flush behind it, so
-            // a recorded body has to move it that same step rather than only far enough
-            // to clear itself. Shoving it only clear leaves the crates behind the first
-            // one engaged on different ticks than they were, and the pile replays out
-            // of step with the run that pushed it. A body travelling faster than the
-            // crates still may not end up inside one.
-            const clearance = dx !== 0
-              ? dx > 0 ? nr.x + nr.w + EPS - rect.x : nr.x - EPS - (rect.x + rect.w)
-              : nr.y - EPS - (rect.y + rect.h);
+            // Exactly what the live body moves it: one push step, along the way the
+            // body was going. `pushBox` does the same, and the two have to agree to
+            // the pixel — a recorded body that shoves harder than the run did leaves
+            // the crate overlapping the one in front, the next tick's depenetration
+            // undoes that, and the pile ends up somewhere the run never put it.
             const step = this.shoveStep(chain);
-            const pushAmount = dx !== 0
-              ? Math.sign(dx) * Math.max(step, Math.abs(clearance))
-              : clearance;
+            const pushAmount = intentX !== 0 ? Math.sign(intentX) * step : -step;
             const beforeGhostSupport = this.boxes.map((box) => ({ x: box.state.x, y: box.state.y }));
-            this.shoveChain(chain, pushAmount, dx !== 0 ? 'x' : 'y');
+            this.shoveChain(chain, pushAmount, intentX !== 0 ? 'x' : 'y', fallingIds);
             for (const entry of chain) {
               this.ghostPushedIds.add(entry.id);
               claimed.add(entry.id);
@@ -917,11 +1007,54 @@ export class World {
     return carried;
   }
 
-  /** Returns the boxes a recorded body already moved this tick. */
+  /** Every object's position right now, as a before-snapshot for a carry pass. */
+  private boxPositions(): Array<{ x: number; y: number }> {
+    return this.boxes.map((b) => ({ x: b.state.x, y: b.state.y }));
+  }
+
+  /**
+   * One tick of the objects, and then of the recorded bodies acting on them.
+   *
+   * The order is the point. The objects take their own tick first — gravity, and
+   * whatever that runs them into — and only then do the recorded bodies act, which
+   * is where the live body acts: `step` shoves through `stepPlayer` immediately
+   * after this returns. With the two either side of the object pass, a crate shoved
+   * past the lip of a ledge was already standing over nothing when gravity reached
+   * it, so it began falling a tick earlier replayed than it had when the run was
+   * lived — half a pixel of head start, and the crate lands 126px away.
+   *
+   * Each carry pass takes its own before-snapshot, so none of them can mistake
+   * another's movement for a support's and hand it on a second time.
+   */
   private stepBoxesForward(target: number): Set<number> {
-    const all = this.boxes;
+    const here = { x: this.player.x, y: this.player.y };
+
+    this.stepBoxesOwnMotion(target);
+
+    const beforeGhostMotion = this.boxPositions();
     const carried = this.applyGhostMotion(target);
-    const ghosts = this.ghostSolidsAt(target);
+    for (const id of carried) {
+      const box = this.boxes[id];
+      if (!box) continue;
+      box.state.vy = 0;
+      box.state.vx = 0;
+    }
+    const handled = new Set<number>([...carried, ...this.ghostPushedIds]);
+    for (const id of this.carryBoxesBySupport(beforeGhostMotion, here, here, handled)) handled.add(id);
+    return handled;
+  }
+
+  /**
+   * Gravity, and whatever it runs each object into.
+   *
+   * Recorded bodies are solid here at the position they hold at the *start* of the
+   * tick: they have not moved yet, and resolving against where they are about to be
+   * lands a crate riding one on its new position, which the pass after this would
+   * then carry it to a second time.
+   */
+  private stepBoxesOwnMotion(target: number): void {
+    const all = this.boxes;
+    const ghosts = this.ghostSolidsAt(this.now);
     const ordered = [...all].sort((a, b) => a.state.y - b.state.y || a.state.x - b.state.x);
     for (const box of ordered) {
       // Held objects are pinned where the level suspended them until their tick.
@@ -929,25 +1062,17 @@ export class World {
         box.state = { ...box.initial };
         continue;
       }
-      if (carried.has(box.id)) {
-        box.state.vy = 0;
-        box.state.vx = 0;
-        continue;
-      }
       box.state.vy = Math.min(box.state.vy + GRAVITY * DT, 900);
       const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
       // A monolith is stopped by the ground and by whatever crate is under it, and by
       // nothing else: not by a pad, not by a former self, and never sideways.
-      const pushedSolids = this.boxes
-        .filter((o) => o !== box && this.ghostPushedIds.has(o.id))
-        .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }));
       const others = box.immovable
         ? this.boxes
           .filter((o) => o !== box && !o.immovable)
           .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
           .concat(this.phaseSolids(), this.springs)
-        : [...this.otherBoxSolids(box), ...ghosts, ...pushedSolids];
-      if (!box.immovable) depenetrate(rect, this.map, others, 'both');
+        : [...this.otherBoxSolids(box), ...ghosts];
+      if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);
       // If the box landed on something stop its vertical velocity. If it
@@ -967,7 +1092,19 @@ export class World {
       box.state.y = rect.y;
       box.state.vx = 0;
     }
-    for (const box of ordered) {
+  }
+
+  /**
+   * Writes every object's worldline for the tick just finished.
+   *
+   * This has to be the last thing the tick does. Written from inside
+   * `stepBoxesForward` it ran before the live body had shoved anything and before
+   * either carry pass, so a crate being pushed was recorded a whole push step behind
+   * where it was actually drawn — and reversing time retraces the record, so the
+   * rewind played back a path that was never the one lived.
+   */
+  private recordBoxes(target: number): void {
+    for (const box of this.boxes) {
       // When simulation resumes after a scrub past recordedMax (e.g. stepping off
       // a chronoporter), the skipped ticks were never filled in.  Backfill the gap
       // with the last known state so scrubbing backwards lands on consistent data.
@@ -978,7 +1115,6 @@ export class World {
       box.record[target] = { ...box.state };
       box.recordedMax = Math.max(box.recordedMax, target);
     }
-    return new Set([...carried, ...this.ghostPushedIds]);
   }
 
   private stepPlayer(input: Input): void {
@@ -1033,14 +1169,18 @@ export class World {
     // Anything that moved into the body since the last tick is undone the short
     // way out first, so the movement below is not asked to resolve it along its
     // own axis.
-    const dp = depenetrate(rect, this.map, solids);
-    const hx = moveX(rect, p.vx * DT, this.map, solids);
+    // The live body may not rest inside a crate: doing so is a crushing.
+    const dp = depenetrate(rect, this.map, solids, 'any');
+    // What the body is trying to do this tick, kept whether or not it gets to.
+    const intentX = p.vx * DT;
+    p.intentX = intentX;
+    const hx = moveX(rect, intentX, this.map, solids);
     if (hx.hit) {
       if (hx.hitId >= 0 && this.dir === 1) this.pushBox(this.boxes[hx.hitId], Math.sign(p.vx), rect);
       p.vx = 0;
     }
     const movedSolids = this.solids();
-    const postPushDep = depenetrate(rect, this.map, movedSolids);
+    const postPushDep = depenetrate(rect, this.map, movedSolids, 'any');
     const hy = moveY(rect, p.vy * DT, this.map, movedSolids);
     if (hy.groundedOn !== GROUND_NONE) p.vy = 0;
     if (hy.ceiling) p.vy = 0;
@@ -1056,7 +1196,19 @@ export class World {
       this.sprungOn = sprung;
       this.springing = true;
     }
-    if (Math.max(dp.correction, hx.correction, hy.correction, postPushDep.correction) > PLAYER_W) this.crushed = true;
+    // Something closed on the body if resolving it took more than its own width to
+    // undo — or if resolving could not free it at all. Depenetration takes the
+    // shortest way out and no longer flings a trapped body clear of whatever holds
+    // it, so being left buried is the thing to read now: a stone coming down on
+    // you leaves you inside it with the floor below and its own mass above, and no
+    // exit either side that is not more of the same stone.
+    const buried = Math.max(dp.buried ?? 0, postPushDep.buried ?? 0);
+    if (
+      Math.max(dp.correction, hx.correction, hy.correction, postPushDep.correction) > PLAYER_W ||
+      buried > CRUSH_DEPTH
+    ) {
+      this.crushed = true;
+    }
     p.x = rect.x;
     p.y = rect.y;
     p.groundedOn = this.sprungOn
@@ -1113,7 +1265,13 @@ export class World {
   private pushBox(box: Box, dirSign: number, playerRectAfter: Rect): void {
     if (!box || dirSign === 0 || box.immovable) return;
 
-    const chain = this.pushChain(box, dirSign, 0);
+    // A crate on its way off a ledge is no longer part of the row: it neither
+    // joins the shove nor holds it up. Without this the body pushing a chain comes
+    // to a dead stop for the quarter second the far stack takes to drop past the
+    // row it left, and pays drag for crates that are no longer there — so a chain
+    // gets *harder* to push as it gets shorter.
+    const falling = this.fallingBoxIds();
+    const chain = this.pushChain(box, dirSign, 0, falling);
     if (chain.length === 0) return;
 
     const front = chain[0];
@@ -1123,8 +1281,22 @@ export class World {
       return;
     }
 
-    this.shoveChain(chain, dirSign * step, 'x');
-    playerRectAfter.x = dirSign > 0 ? front.state.x - playerRectAfter.w - 0.02 : front.state.x + front.w + 0.02;
+    const frontBefore = front.state.x;
+    this.shoveChain(chain, dirSign * step, 'x', falling);
+    const travelled = front.state.x - frontBefore;
+    // The body keeps up with the crate it is shoving — but only as far as the
+    // crate actually went, and never backwards. Placed flush against the crate
+    // whatever the distance, a body that has ended up well inside one — caught by
+    // a fraction of a pixel by a crate falling past its head — is dragged most of
+    // a crate's width back up the corridor in a single tick, and a former self
+    // replaying that jump takes whatever it is carrying along with it. An overlap
+    // is for the depenetration after this to settle, a step at a time.
+    const flush = dirSign > 0
+      ? front.state.x - playerRectAfter.w - EPS
+      : front.state.x + front.w + EPS;
+    playerRectAfter.x = dirSign > 0
+      ? clamp(flush, playerRectAfter.x, playerRectAfter.x + Math.max(travelled, 0))
+      : clamp(flush, playerRectAfter.x + Math.min(travelled, 0), playerRectAfter.x);
   }
 
   /**
@@ -1139,10 +1311,13 @@ export class World {
       const g = playerRect(state);
 
       // A monolith goes through anything that is not holding it up, a former self
-      // included: the run that walked there cannot have survived it.
+      // included: the run that walked there cannot have survived it. It has to be
+      // caught by the same depth that would have killed the live body, though —
+      // clipping the corner of a falling stone is something a body walks away from,
+      // and a history that survived it is not contradicted by replaying it.
       for (const box of this.boxes) {
         if (!box.immovable || this.now < box.releaseTick) continue;
-        if (rectsOverlap(g, boxRect(box))) {
+        if (overlapDepth(g, boxRect(box)) > CRUSH_DEPTH) {
           return { run, tick: this.now, reason: 'a former self was crushed by a monolith', x: g.x, y: g.y };
         }
       }
@@ -1198,6 +1373,7 @@ export class World {
       facing: 1,
       ducking: false,
       groundedOn: GROUND_TILE,
+      intentX: 0,
     };
   }
 }

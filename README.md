@@ -7,7 +7,9 @@ object simulated on top of it.
 ```
 npm install
 npm run dev        # http://localhost:5173
-npm run check      # lint + typecheck + headless simulation checks
+npm run check      # lint + typecheck
+npm run sim        # headless simulation checks: every level, live and replayed
+npm run sim -- rewind-fidelity   # reversing time retraces the path that was lived
 npm run build      # production bundle in dist/
 ```
 
@@ -118,5 +120,5 @@ src/game/level.ts     level geometry and devices
 src/game/GameScene.ts input, tick loop, rendering, fail states
 src/game/HudScene.ts  time slider, direction indicator, banners
 src/game/fisheye.ts   post-processing collapse shader
-tools/simcheck.ts     headless checks for the timeline mechanics
+tools/sim/            headless checks for the timeline mechanics
 ```
