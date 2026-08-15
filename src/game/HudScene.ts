@@ -263,6 +263,19 @@ export class HudScene extends Phaser.Scene {
       g.fillCircle(ax, TRACK_Y + 22, 3 + 4 * anomalyPulse);
     }
 
+    // Crate contradictions: a square below the track for each, in the same band as
+    // the anomaly diamonds and the same colour, because they are the same kind of
+    // wound — one retracing the player's path, one eating back down a crate's. The
+    // stretch of the crate's past already unwritten is dragged out behind it, so
+    // how much history is left reads off the track directly.
+    for (const paradox of w.crateParadoxes) {
+      const cx = TRACK_X + (paradox.tick / TICKS) * TRACK_W;
+      const fx = TRACK_X + (paradox.from / TICKS) * TRACK_W;
+      g.fillStyle(0xff4d6d, 0.14 + 0.12 * anomalyPulse).fillRect(cx, TRACK_Y + 19, Math.max(1, fx - cx), 6);
+      g.fillStyle(0xff4d6d, 0.35 + 0.4 * anomalyPulse).fillRect(cx - 5, TRACK_Y + 17, 10, 10);
+      g.fillStyle(modalBg, 1).fillRect(cx - 2, TRACK_Y + 20, 4, 4);
+    }
+
     g.fillStyle(trackEnd, 0.9).fillRect(TRACK_X - 3, TRACK_Y - 12, 3, 24);
     g.fillStyle(trackEnd, 0.9).fillRect(TRACK_X + TRACK_W, TRACK_Y - 12, 3, 24);
 

@@ -4,6 +4,7 @@ import { VIEW_H, VIEW_W } from './GameScene';
 import { fadeIn, fadeOutThen } from './transition';
 import { sfx, music } from './audio';
 import { clearStoredGameData, loadCompletedLevels } from './progress';
+import { exitFullscreen, isFullscreen, toggleFullscreen } from './fullscreen';
 import {
   COL_ORBIT_A,
   COL_ORBIT_B,
@@ -223,6 +224,7 @@ export class MenuScene extends Phaser.Scene {
         '• Grey squares above the timeline mark events that happen at a fixed time.\n' +
         '• Use [A] [D] or [←] [→] to move. [W] [↑] or [SPACE] jumps; [S] [↓] crouches.\n' +
         '• [K] abandons the current run and restarts the level. [ESC] returns here.\n' +
+        '• In fullscreen, [ESC] only leaves fullscreen from the archive screen.\n' +
         '• [M] toggles sound.\n' +
         '• If you create a paradox and you don\'t know why, it could be a numerical error\n made by an alternate self:\n if a crate is on the exact tipping point of falling from a ledge,\n then it may go either way in different playbacks.\n It\'s your own fault for making such an unstable timeline :)\n\n' +
         '[ CLICK, H, OR ESC TO CLOSE ]',
@@ -256,7 +258,12 @@ export class MenuScene extends Phaser.Scene {
     kb.on('keydown-ESC', () => {
       if (this.helpOpen) this.toggleHelp();
       else if (this.settingsOpen) this.toggleSettings();
-      else if (this.code === null) fadeOutThen(this, 200, () => this.scene.start('title'));
+      else if (this.code !== null) return; // the author prompt cancels itself in typeCode
+      // The archive is the one screen where ESC has nothing left to back out of,
+      // so it is where leaving fullscreen belongs. Everywhere else the keyboard
+      // lock keeps ESC in the page.
+      else if (isFullscreen()) exitFullscreen();
+      else fadeOutThen(this, 200, () => this.scene.start('title'));
     });
     kb.on('keydown', (e: KeyboardEvent) => {
       if (this.modalOpen) return;
@@ -287,7 +294,7 @@ export class MenuScene extends Phaser.Scene {
         const hitRow = this.settingsRowAt(p);
         if (hitRow === 3) this.resetSaves();
         else if (hitRow === 0) sfx.toggleMute();
-        else if (hitRow === 1) this.toggleFullscreen();
+        else if (hitRow === 1) toggleFullscreen();
         else if (!hit(SETTINGS_PANEL, p)) this.toggleSettings();
         return;
       }
@@ -522,14 +529,6 @@ export class MenuScene extends Phaser.Scene {
     this.helpOpen = false;
   }
 
-  private toggleFullscreen(): void {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      document.documentElement.requestFullscreen();
-    }
-  }
-
   private resetSaves(): void {
     if (!window.confirm('Clear all saved game data?')) return;
     clearStoredGameData();
@@ -598,7 +597,7 @@ export class MenuScene extends Phaser.Scene {
     // Update dynamic value texts for sound and fullscreen
     if (this.settingsRowTexts.length >= 8) {
       this.settingsRowTexts[4].setText(sfx.isMuted ? 'OFF' : 'ON');
-      this.settingsRowTexts[5].setText(document.fullscreenElement ? 'ON' : 'OFF');
+      this.settingsRowTexts[5].setText(isFullscreen() ? 'ON' : 'OFF');
       this.settingsRowTexts[6].setText('');
       this.settingsRowTexts[7].setText('CLEAR SAVES');
     }

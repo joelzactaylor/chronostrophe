@@ -113,6 +113,21 @@ open one route and close another at the same time. Solid blocks are filled orang
 are a dashed outline, and their state is derived from the world every tick rather than stored —
 scrub anywhere on the timeline and the blocks are in the phase that tick's world implies.
 
+A button works **while time runs backwards too**, and it overrules the recording: standing in one
+during a rewind opens its route now, whatever the blocks were doing on that tick when it was lived.
+Everything you are not touching still retraces itself exactly, so a rewind is only altered where you
+alter it — step out of the button and the recorded phase comes straight back.
+
+That is a way to cut history, so it comes with a price. A crate that history has resting on a block
+you pull out from under it during a rewind is left standing on nothing: it is not falling — a
+rewinding crate follows its record, not gravity — it is impossible. Such a crate **comes apart**. It
+goes crackly, stops being solid to anything at all, freezes where it broke, and the contradiction
+runs back down the crate's own past, unwriting it. When it reaches the beginning of the epoch the
+timeline goes with it and the run is over, so the clock it starts is the length of history behind
+it. A chronoclast makes torn crates whole again — it destroys the past they are in contradiction
+with. Design for it: a route opened by a reverse-time press is worth the cost only if nothing is
+parked on the blocks it opens, or if you meant the clock.
+
 Both forms are shared by everything: a phased-out block will not hold up a crate, and a block that
 goes solid under a monolith stops it exactly as a crate would. Some ideas the pair gives you:
 
@@ -159,11 +174,18 @@ and printed as that function's source.
 | rename | `F2` |
 | test play | `T` — `ESC` in the level brings you straight back |
 | export | `X` — the `build…` function, with a COPY button |
+| load a shipped level | `L` — pick one by name or campaign number; it replaces the draft |
 | clear | `N` |
 | leave | `ESC` |
 
 The draft is kept in `localStorage`, so it survives a reload. Exporting does not add the level to the
 game: paste the printed function into `src/game/level.ts` and add its name to `LEVELS`.
+
+Loading a shipped level reads it back through the tools, so anything a tool cannot place is snapped
+to what it can: a crate off the tile grid moves to its tile, a gate not on a tile's centre moves to
+one, and crates are listed before monoliths whatever order they were written in. Run
+`npm run sim -- level-roundtrip` to see which levels that touches before editing one — it walks every
+level out to a draft and back, and prints what came back different.
 
 ## Verifying it
 

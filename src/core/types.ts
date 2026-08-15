@@ -16,6 +16,9 @@ export const PHASE_SOLID = -5;
 /** A spring block: solid to stand on, and it throws off whatever lands on it. */
 export const SPRING_SOLID = -6;
 
+/** No spring threw this body on this tick. */
+export const NO_SPRING = -1;
+
 export interface Rect {
   x: number;
   y: number;
@@ -44,6 +47,17 @@ export interface PlayerState {
    * recorded too.
    */
   intentX: number;
+  /**
+   * The spring that threw this body on this tick, as an index into the level's
+   * springs, or `NO_SPRING`.
+   *
+   * Firing is an event, and a position is not one: a body thrown on this tick and
+   * a body falling past on the next stand in the same place a pixel apart, and a
+   * former self retracing either has nothing in its recorded pose to tell them
+   * apart. Which spring threw it is therefore recorded like anything else that
+   * happened, and a ghost replaying the tick fires the spring again.
+   */
+  sprung: number;
 }
 
 export interface BoxState {
@@ -51,6 +65,8 @@ export interface BoxState {
   y: number;
   vx: number;
   vy: number;
+  /** The spring that threw this crate on this tick, as for `PlayerState.sprung`. */
+  sprung: number;
 }
 
 /** A contiguous segment of recorded player history. */

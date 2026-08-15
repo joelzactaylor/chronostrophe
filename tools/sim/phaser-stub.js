@@ -36,8 +36,12 @@ const Matter = {
   Engine: { update: noop },
 };
 
+class PostFXPipeline {}
+
 const Phaser = {
   Physics: { Matter: { Matter } },
+  Renderer: { WebGL: { Pipelines: { PostFXPipeline } } },
+  Scene: class {},
 };
 
 export default Phaser;

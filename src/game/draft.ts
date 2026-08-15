@@ -102,6 +102,69 @@ export function draftToLevel(d: Draft): LevelDef {
   };
 }
 
+/**
+ * A built level read back as a draft: the inverse of `draftToLevel`, resolving the
+ * pixels a level function deals in to the tile coordinates the editor draws with.
+ * Only what the tools can place survives the trip: a stone that is not the 4x3 the
+ * monolith tool makes comes back as a crate, a button drawn several tiles wide comes
+ * back as one button a tile, and anything written off the grid — a crate at some
+ * pixel between two tiles, a gate on a tile's edge rather than its centre — moves to
+ * the nearest place a tool can put it. `npm run sim -- level-roundtrip` reports which
+ * levels that is true of.
+ */
+export function levelToDraft(l: LevelDef): Draft {
+  /** The tile a pixel edge sits on. Every level places on the grid, so this is exact. */
+  const tile = (px: number): number => Math.round(px / TILE);
+  /** How many tiles wide a rect is, for the pieces an author can stretch. */
+  const wide = (w: number): number => Math.max(1, Math.round(w / TILE));
+
+  const rows: string[] = [];
+  for (let y = 0; y < ROWS; y++) {
+    let row = '';
+    for (let x = 0; x < COLS; x++) row += l.map.isSolid(x, y) ? '#' : '.';
+    rows.push(row);
+  }
+
+  const crates: Draft['crates'] = [];
+  const monoliths: Draft['monoliths'] = [];
+  for (const b of l.boxes) {
+    if (b.w === 4 * TILE && b.h === 3 * TILE) monoliths.push({ cx: tile(b.x), tick: b.releaseTick ?? 0 });
+    else crates.push({ cx: tile(b.x), row: tile(b.y + b.h) });
+  }
+
+  const buttons: Draft['buttons'] = [];
+  for (const b of l.buttons ?? []) {
+    for (let i = 0; i < wide(b.rect.w); i++) {
+      buttons.push({ cx: tile(b.rect.x) + i, row: tile(b.rect.y + BUTTON_H), group: b.group });
+    }
+  }
+
+  const springs: Draft['springs'] = [];
+  for (const sp of l.springs ?? []) {
+    for (let i = 0; i < wide(sp.w); i++) springs.push({ cx: tile(sp.x) + i, row: tile(sp.y + sp.h) });
+  }
+
+  return {
+    name: l.name,
+    rows,
+    spawn: { cx: tile(l.spawn.x), row: tile(l.spawn.y + 28) },
+    exit: { cx: Math.round(l.exit.x / TILE - 0.5), row: tile(l.exit.y + 26) },
+    crates,
+    monoliths,
+    pads: l.devices.map((d) => ({ kind: d.kind, cx: tile(d.rect.x), row: tile(d.rect.y + d.rect.h) })),
+    buttons,
+    phase: (l.phase ?? []).map((p) => ({
+      cx: tile(p.rect.x),
+      cy: tile(p.rect.y),
+      group: p.group,
+      inverted: p.inverted,
+    })),
+    hazards: l.hazards.map((h) => ({ cx: tile(h.x), cy: tile(h.y) })),
+    hazardsInverted: l.hazardsInverted.map((h) => ({ cx: tile(h.x), cy: tile(h.y) })),
+    springs,
+  };
+}
+
 /** An identifier for the build function: "Deep Water" becomes buildDeepWater. */
 function fnName(name: string): string {
   const parts = name.split(/[^A-Za-z0-9]+/).filter(Boolean);

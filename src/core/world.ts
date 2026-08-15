@@ -8,6 +8,7 @@ import {
   GROUND_GHOST,
   GROUND_NONE,
   GROUND_TILE,
+  NO_SPRING,
   PHASE_SOLID,
   PlayerState,
   SPRING_SOLID,
@@ -75,6 +76,36 @@ const CRUSH_DEPTH = 6;
 const GHOST_SUPPORT_PROBE = 24;
 const GHOST_FLOATING_EPSILON = 0.05;
 
+/**
+ * How long a recorded body has to hang there, still and over nothing, before its
+ * history counts as impossible rather than merely mid-motion.
+ *
+ * Generous on purpose. Reading "resting on nothing" off a single tick calls a
+ * paradox on every settling frame — a body a fraction of a pixel clear of what
+ * holds it, a crate a tick behind the support it rides — and the punishment for
+ * a false one is the loss of a run that did nothing wrong.
+ */
+const FLOATING_TICKS = 10;
+
+/**
+ * How far from a recorded body's feet something may sit and still be holding it
+ * up — below the feet for anything solid, and sideways too for the solids that
+ * can move (see `restsOnSomething`).
+ *
+ * The same slack the ghost-carry probe uses, and for the same reason: a record is
+ * a pose at the end of a tick, and the world it is replayed into settles a
+ * fraction differently. Contact is not a thing to test exactly — and footing is
+ * legal down to a pixel of lip, so the sideways settle that matters is the whole
+ * of a footprint's overlap, not a fraction of it.
+ */
+const FLOATING_SLACK = GHOST_SUPPORT_PROBE;
+
+/**
+ * Ticks of a crate's record that come apart per tick once its worldline is
+ * contradicted — the same rate at which an anomaly outruns its cause.
+ */
+const UNWRITE_SPEED = 3;
+
 export interface Input {
   left: boolean;
   right: boolean;
@@ -140,6 +171,24 @@ export interface Paradox {
   y: number;
 }
 
+/**
+ * A crate whose worldline the world can no longer produce: it is resting on
+ * nothing, and history says it has been resting there for some time.
+ *
+ * The crate itself stops being part of the world — nothing stands on it, nothing
+ * is stopped by it, no button feels it — and the contradiction runs back down its
+ * own record from the tick it broke, unwriting the crate's past as it goes.
+ * Reaching the beginning of the epoch is reaching a point where the crate never
+ * had a history to contradict, and the timeline does not survive that.
+ */
+export interface CrateParadox {
+  boxId: number;
+  /** The tick it broke on, where the unwriting set off from. */
+  from: number;
+  /** How far back down the record the unwriting has come. */
+  tick: number;
+}
+
 export function playerRect(s: { x: number; y: number; ducking: boolean }): Rect {
   return { x: s.x, y: s.y, w: PLAYER_W, h: s.ducking ? PLAYER_DUCK_H : PLAYER_H };
 }
@@ -190,10 +239,25 @@ export class World {
   private readonly deviceSolids: SolidRect[];
 
   readonly springs: SolidRect[];
-  /** Set on the tick a spring throws the body, for the sound and the squash. */
-  sprungOn: Rect | null = null;
+  /**
+   * Every spring firing as the world now stands, for the sound and the squash.
+   *
+   * Read off the bodies rather than accumulated as the tick runs: each of them
+   * carries the spring that threw it (`sprung`), so a bounce shows itself whether
+   * it is being lived by the body, dropped onto by a crate, or replayed by a
+   * former self retracing the tick it bounced on.
+   */
+  firedSprings: Rect[] = [];
   /** True while a spring's throw is still carrying the body upward. */
   private springing = false;
+
+  /**
+   * The crates whose history has come apart, and how far back down it the
+   * unwriting has reached. A broken crate is frozen where it stands: it has been
+   * taken out of the world rather than left in it as an object with no history.
+   */
+  crateParadoxes: CrateParadox[] = [];
+  private broken = new Set<number>();
 
   readonly buttons: ButtonSpec[];
   readonly phase: PhaseSpec[];
@@ -208,6 +272,24 @@ export class World {
    * walked through a wall, and no false anomaly is created.
    */
   private readonly phaseSolidityHistory: (boolean[] | undefined)[] = new Array(TICKS + 1);
+  /**
+   * Which buttons the *live body* was standing in at each recorded tick.
+   *
+   * Reverse playback retraces the recorded solidity, and that record is only
+   * binding for as long as the world still agrees with it. This is what the
+   * agreement is measured against — and it is the body's own contribution rather
+   * than the whole world's, because the rest of the world is *already* in the
+   * record. Crates and former selves put back on a button by a rewind are the
+   * same crates and former selves the recording was made with; they are read a
+   * tick out of phase (buttons are read before the world moves, which going
+   * backwards is the tick being left), so comparing the whole pressed set threw
+   * the recorded solidity away at every edge a ghost crossed — and a former self
+   * walking a run of phase blocks it had opened for itself was left standing on
+   * blocks the rewind had reopened a tick early.
+   */
+  private readonly bodyPressedHistory: (number[] | undefined)[] = new Array(TICKS + 1);
+  /** The groups the live body alone is standing in, as the buttons were last read. */
+  private bodyPressed = new Set<number>();
 
   constructor(
     map: TileMap,
@@ -228,7 +310,7 @@ export class World {
     if (!matterWorld) throw new Error('World requires a Phaser Matter world');
     this.crates = new CrateWorld(map, devices, springs, matterWorld);
     boxes.forEach((b, i) => {
-      const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0 };
+      const initial: BoxState = { x: b.x, y: b.y, vx: 0, vy: 0, sprung: NO_SPRING };
       const record: (BoxState | undefined)[] = new Array(TICKS + 1);
       record[0] = { ...initial };
       this.boxes.push({
@@ -252,12 +334,13 @@ export class World {
       ducking: false,
       groundedOn: GROUND_NONE,
       intentX: 0,
+      sprung: NO_SPRING,
     };
     this.current = this.newRun();
     this.recordPlayer();
     this.updateButtons();
     this.updatePhaseSolids();
-    this.recordPhaseSolidity(0);
+    this.recordPhaseState(0);
   }
 
   /**
@@ -267,10 +350,16 @@ export class World {
    * `updatePhaseSolids` — call that after calling this.
    */
   updateButtons(): void {
-    const bodies: Rect[] = [playerRect(this.player), ...this.boxes.map(boxRect)];
+    const live = playerRect(this.player);
+    const bodies: Rect[] = [live, ...this.wholeBoxes().map(boxRect)];
     for (const { state } of this.ghostsAt(this.now)) bodies.push(playerRect(state));
     this.pressed = new Set(
       this.buttons.filter((b) => bodies.some((r) => rectsOverlap(r, b.rect))).map((b) => b.group),
+    );
+    // Kept apart from the rest, because it is the only part of the pressed set a
+    // recording cannot already account for. See `bodyPressedHistory`.
+    this.bodyPressed = new Set(
+      this.buttons.filter((b) => rectsOverlap(live, b.rect)).map((b) => b.group),
     );
   }
 
@@ -298,7 +387,7 @@ export class World {
    * sitting in a phase slot keeps it from materialising around it.
    */
   updatePhaseSolids(): void {
-    const bodies: Rect[] = [playerRect(this.player), ...this.boxes.map(boxRect)];
+    const bodies: Rect[] = [playerRect(this.player), ...this.wholeBoxes().map(boxRect)];
     for (const { state } of this.ghostsAt(this.now)) bodies.push(playerRect(state));
 
     for (const p of this.phase) {
@@ -324,27 +413,52 @@ export class World {
   }
 
   /**
-   * Snapshots each phase block's effective solidity into `phaseSolidityHistory`
-   * for the given tick, so the becoming-solid delay leaves a trace that reverse
-   * playback and scrubbing can retrace.
+   * Snapshots each phase block's effective solidity, and which buttons held it
+   * that way, so the becoming-solid delay leaves a trace that reverse playback and
+   * scrubbing can retrace.
    */
-  private recordPhaseSolidity(tick: number): void {
+  private recordPhaseState(tick: number): void {
     const t = clamp(tick, 0, TICKS);
     this.phaseSolidityHistory[t] = this.phase.map((p) => this.isSolidPhase(p));
+    // The buttons were read at the top of the tick and have not been read since,
+    // so this is the contribution that governed the solidity being recorded.
+    this.bodyPressedHistory[t] = [...this.bodyPressed];
   }
 
   /**
-   * Restores every phase block to the solidity it had at the given recorded tick.
+   * Restores the phase blocks to the state they held at the given recorded tick.
    * Called when the timeline moves to a point whose state is already known, so the
    * transient passability of a becoming-solid delay is reproduced exactly — a ghost
    * that crossed a block while it was waiting to solidify is not judged to have
    * walked through a wall.
+   *
+   * A group is left to the live world only where the *body's own* standing in its
+   * button differs from what the body was doing when the tick was recorded.
+   * Buttons are pressable while time runs backwards, and standing in one is the
+   * whole of how a route is opened — a press the recording answered for would be
+   * no press at all — but the body is the only thing a recording cannot account
+   * for. Everything else on a button during a rewind is the very crate or former
+   * self the recording was made with.
    */
-  private restorePhaseSolidity(tick: number): void {
+  private restorePhaseState(tick: number): void {
     const t = clamp(tick, 0, TICKS);
     const snapshot = this.phaseSolidityHistory[t];
-    if (snapshot) {
-      for (let i = 0; i < this.phase.length; i++) this.phase[i]._solid = snapshot[i];
+    const bodyThen = this.bodyPressedHistory[t];
+    if (!snapshot || !bodyThen) return;
+    const then = new Set(bodyThen);
+    const live = playerRect(this.player);
+    for (let i = 0; i < this.phase.length; i++) {
+      const p = this.phase[i];
+      if (this.bodyPressed.has(p.group) !== then.has(p.group)) continue;
+      // The live body is the other thing the record cannot account for: a block
+      // that was solid at this tick must not materialise around where the body
+      // stands now. This is the forward delay's exception — a block that wants
+      // to be solid waits while something is inside it — held to during the
+      // retrace, and like the delay it guards only the passable → solid edge:
+      // the restore keeps trying, so the block goes solid the moment the body
+      // is out of it.
+      if (snapshot[i] && !p._solid && rectsOverlap(live, p.rect)) continue;
+      p._solid = snapshot[i];
     }
   }
 
@@ -411,6 +525,8 @@ export class World {
         y: box.state.y,
         vx: reversing ? -box.state.vx : box.state.vx,
         vy: reversing ? -box.state.vy : box.state.vy,
+        // Whatever threw the crate belongs to the timeline that just ended.
+        sprung: NO_SPRING,
       };
       // Write the effective velocity back so forward physics continues from the
       // crate's actual motion (a crate caught rising keeps its upward velocity).
@@ -434,7 +550,14 @@ export class World {
     // the blocks go back to their state as the world stands, and the record
     // refills from the current tick forward.
     this.phaseSolidityHistory.fill(undefined);
-    this.recordPhaseSolidity(this.now);
+    this.bodyPressedHistory.fill(undefined);
+    // A contradiction is a quarrel with a recorded past, and there is no longer a
+    // recorded past to quarrel with. The torn crates are whole again, wherever the
+    // tearing left them, as the first fact of a timeline that has never seen them
+    // anywhere else.
+    this.crateParadoxes = [];
+    this.broken.clear();
+    this.recordPhaseState(this.now);
   }
 
   boxStateAt(box: Box, t: number): BoxState {
@@ -458,8 +581,14 @@ export class World {
 
   solids(): SolidRect[] {
     return this.boxes
+      .filter((b) => !this.broken.has(b.id))
       .map((b) => ({ x: b.state.x, y: b.state.y, w: b.w, h: b.h, id: b.id }))
       .concat(this.phaseSolids());
+  }
+
+  /** The crates the world still has to answer for: everything but the torn ones. */
+  private wholeBoxes(): Box[] {
+    return this.boxes.filter((b) => !this.broken.has(b.id));
   }
 
   /**
@@ -520,13 +649,13 @@ export class World {
     } else {
       // A known point of the timeline: place each object at its recorded state.
       this.now = target;
-      for (const box of this.boxes) {
+      for (const box of this.wholeBoxes()) {
         const s = this.boxStateAt(box, this.now);
         box.state = { ...s };
       }
       // Restore what the phase blocks looked like at this tick so the view and
       // the paradox judgement match history (including transient passability).
-      this.restorePhaseSolidity(target);
+      this.restorePhaseState(target);
     }
     this.updateButtons();
     this.updatePhaseSolids();
@@ -552,7 +681,7 @@ export class World {
       this.recordBoxes(t + 1);
       // Keep the phase solidity record in step with the simulated boxes so a
       // later reversal through this stretch reproduces the same blocks.
-      this.recordPhaseSolidity(t + 1);
+      this.recordPhaseState(t + 1);
     }
     this.now = target;
   }
@@ -568,24 +697,27 @@ export class World {
   step(input: Input): void {
     this.updateButtons();
     this.updatePhaseSolids();
-    // Clear any previous tick's spring firing; this tick's springs will set it.
-    this.sprungOn = null;
+    // Clamp to the epoch bounds: the chronoclast cut the timeline at epochStart, so
+    // rewinding stops there and never reaches pre-chronoclast time.
+    const target = clamp(this.now + this.dir, this.epochStart, TICKS);
     // When time runs backward, the phase blocks must retrace the exact solidity
     // they had going forward: the becoming-solid delay left them passable for a
     // window, and restoring that from history keeps a ghost from reading as having
     // walked through a wall. Restore before the body moves so the transient
-    // passability is in effect for the tick being retraced.
-    if (this.dir === -1) this.restorePhaseSolidity(this.now);
-    // Clamp to the epoch bounds: the chronoclast cut the timeline at epochStart, so
-    // rewinding stops there and never reaches pre-chronoclast time.
-    const target = clamp(this.now + this.dir, this.epochStart, TICKS);
+    // passability is in effect for the tick being retraced — and restore the tick
+    // being *entered*, which is the one the world is judged at when the step is
+    // over. Restoring the tick being left put the blocks a tick ahead of the
+    // former selves standing on them, one of whom was dropped through a floor it
+    // had not opened yet.
+    if (this.dir === -1) this.restorePhaseState(target);
     const beforeBoxes = this.boxPositions();
 
     let ghostHandled = new Set<number>();
     if (this.dir === 1) {
       ghostHandled = this.stepBoxesForward(target);
     } else {
-      for (const box of this.boxes) box.state = { ...this.boxStateAt(box, target) };
+      // A torn crate has no worldline left to retrace: it stays where it broke.
+      for (const box of this.wholeBoxes()) box.state = { ...this.boxStateAt(box, target) };
       // A rewinding object is retracing its own worldline, and that worldline
       // already contains everything that happened to it — the shove, the ride, the
       // fall. Letting the carry pass add its support's movement on top counts the
@@ -629,7 +761,11 @@ export class World {
     // Going forward, remember the solidity each phase block ended the tick with,
     // so that reversing back through here can reproduce it (including the delay
     // window during which a block was passable despite wanting to be solid).
-    if (this.dir === 1) this.recordPhaseSolidity(target);
+    if (this.dir === 1) this.recordPhaseState(target);
+    this.readFiredSprings(true);
+    // Contradictions do not wait on the direction of time: a crate's past comes
+    // apart at its own rate, whichever way the world is running.
+    this.unwriteCrateHistory();
   }
 
   /**
@@ -642,6 +778,37 @@ export class World {
     this.updateButtons();
     this.updatePhaseSolids();
     this.stepPlayer(input);
+    // Only the live body: `now` does not move here, so a crate or a former self
+    // sitting on the tick it bounced would fire its spring again every frame the
+    // player spent on the pad.
+    this.readFiredSprings(false);
+    // A frozen clock is no protection for a history that is already coming apart.
+    this.unwriteCrateHistory();
+  }
+
+  /**
+   * Reads the springs firing right now off the bodies they threw.
+   *
+   * Each body records the spring that threw it on the tick it was thrown, so this
+   * is the same answer whether the tick is being lived, replayed by a former self,
+   * or retraced backwards — no part of it is re-derived from a pose, which is the
+   * one thing a bounce does not leave behind.
+   *
+   * `includeWorld` covers everything but the live body, and is dropped while the
+   * timeline is frozen.
+   */
+  private readFiredSprings(includeWorld: boolean): void {
+    const out: Rect[] = [];
+    const add = (index: number): void => {
+      const spring = this.springs[index];
+      if (index !== NO_SPRING && spring && !out.includes(spring)) out.push(spring);
+    };
+    add(this.player.sprung);
+    if (includeWorld) {
+      for (const box of this.boxes) add(box.state.sprung);
+      for (const { state } of this.ghostsAt(this.now)) add(state.sprung);
+    }
+    this.firedSprings = out;
   }
 
   /**
@@ -663,7 +830,7 @@ export class World {
     // step behind the row underneath. That shear is what leaves a crate lapping
     // its neighbour by a couple of pixels when its own support drops away.
     const row = (box: Box): number => Math.round(box.state.y / ROW_TOLERANCE);
-    const orderedBoxes = [...this.boxes].sort((b, a) => row(a) - row(b) || a.state.x - b.state.x);
+    const orderedBoxes = this.wholeBoxes().sort((b, a) => row(a) - row(b) || a.state.x - b.state.x);
     const propagatedDeltas = new Map<number, { x: number; y: number }>();
     const falling = this.fallingBoxIds();
 
@@ -721,7 +888,7 @@ export class World {
         // away was left lapping the next one along, hanging on that couple of
         // pixels of contact in the way of everything still being pushed.
         const solids = this.boxes
-          .filter((o) => o !== box && !falling.has(o.id))
+          .filter((o) => o !== box && !falling.has(o.id) && !this.broken.has(o.id))
           .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
           .concat(this.deviceSolids, this.phaseSolids(), this.springs);
         depenetrate(rect, this.map, solids);
@@ -743,24 +910,36 @@ export class World {
 
   private otherBoxSolids(box: Box): SolidRect[] {
     return this.boxes
-      .filter((o) => o !== box)
+      .filter((o) => o !== box && !this.broken.has(o.id))
       .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
       .concat(this.deviceSolids, this.phaseSolids(), this.springs);
   }
 
   /** Every crate currently on its way down, and so no part of any row. */
   private fallingBoxIds(): Set<number> {
-    return new Set(this.boxes.filter((box) => this.boxIsFalling(box)).map((box) => box.id));
+    const ghosts = this.ghostSolidsAt(this.now);
+    return new Set(this.boxes.filter((box) => this.boxIsFalling(box, ghosts)).map((box) => box.id));
   }
 
-  private boxIsFalling(box: Box): boolean {
+  /**
+   * On its way down, with nothing beneath it.
+   *
+   * A former self counts as something beneath it. Ghosts are solid to objects —
+   * crates rest on them and ride them — but they are not in `otherBoxSolids`, so a
+   * crate sitting on one used to read as falling: it was skipped by every pass that
+   * leaves falling crates alone, including the one that carries a rider along with
+   * the body underneath it. The crate sat in the air at the height of the head it
+   * was resting on while the former self walked out from under it.
+   */
+  private boxIsFalling(box: Box, ghostSolids?: SolidRect[]): boolean {
     if (box.state.vy > 0.001) return true;
 
+    const ghosts = ghostSolids ?? this.ghostSolidsAt(this.now);
     return (
       supportUnder(
         boxRect(box),
         this.map,
-        this.otherBoxSolids(box),
+        [...this.otherBoxSolids(box), ...ghosts],
       ) === GROUND_NONE
     );
   }
@@ -782,13 +961,27 @@ export class World {
     return overlapX && onTop;
   }
 
-  private boxRidesGhostChain(box: Box, ghostRect: Rect, seen = new Set<number>()): boolean {
+  /**
+   * Standing on a former self, or on something that is.
+   *
+   * A support that is itself on its way down is not part of the chain: a crate
+   * resting on one is falling with it, not riding the body underneath. Counting it
+   * carried the upper crates of a landing stack along with the ghost on the very
+   * tick the bottom one was still dropping onto its head, so the stack came down
+   * leaning, and stayed leaning for the rest of the ride.
+   */
+  private boxRidesGhostChain(
+    box: Box,
+    ghostRect: Rect,
+    seen = new Set<number>(),
+    falling = new Set<number>(),
+  ): boolean {
     if (seen.has(box.id)) return false;
     seen.add(box.id);
     if (this.boxDirectlyRidesGhost(box, ghostRect)) return true;
-    for (const other of this.boxes) {
-      if (other === box || other.immovable || seen.has(other.id)) continue;
-      if (this.boxSupportsBox(other, box) && this.boxRidesGhostChain(other, ghostRect, seen)) {
+    for (const other of this.wholeBoxes()) {
+      if (other === box || other.immovable || seen.has(other.id) || falling.has(other.id)) continue;
+      if (this.boxSupportsBox(other, box) && this.boxRidesGhostChain(other, ghostRect, seen, falling)) {
         return true;
       }
     }
@@ -836,7 +1029,7 @@ export class World {
       seen.add(current.id);
 
       const currentRect = { x: current.state.x, y: current.state.y, w: current.w, h: current.h };
-      const next = this.boxes.find((candidate): boolean => {
+      const next = this.wholeBoxes().find((candidate): boolean => {
         if (
           candidate === current ||
           seen.has(candidate.id) ||
@@ -867,7 +1060,7 @@ export class World {
     const load = new Set<number>(chain.map((entry) => entry.id));
     for (let grew = true; grew;) {
       grew = false;
-      for (const box of this.boxes) {
+      for (const box of this.wholeBoxes()) {
         if (box.immovable || load.has(box.id)) continue;
         if (!this.boxes.some((support) => load.has(support.id) && this.boxSupportsBox(support, box))) continue;
         load.add(box.id);
@@ -947,14 +1140,22 @@ export class World {
       const intentX = next.intentX ?? dx;
       const reachedFor: Rect = { x: pr.x + intentX, y: nr.y, w: nr.w, h: nr.h };
       if (dx === 0 && dy === 0 && intentX === 0) continue;
-      for (const box of this.boxes) {
+      // A stack riding a body has to move in the order that keeps it from treading
+      // on itself: rising, the crate on top goes first and makes room for the one
+      // under it; sinking, the bottom one goes first. Taken in any fixed order, the
+      // crate on the head is blocked by its own stack-mate the moment the body
+      // jumps, is left behind by the rise, and the stack slides off.
+      const riders = dy < 0
+        ? this.wholeBoxes().sort((a, b) => a.state.y - b.state.y)
+        : this.wholeBoxes().sort((a, b) => b.state.y - a.state.y);
+      for (const box of riders) {
         // A monolith is not shoved or carried by anything, least of all a memory.
         if (box.immovable) continue;
         if (claimed.has(box.id) || target < box.releaseTick) continue;
         if (fallingIds.has(box.id)) continue;
         const rect: Rect = { x: box.state.x, y: box.state.y, w: box.w, h: box.h };
         const others = this.otherBoxSolids(box);
-        const riding = this.boxRidesGhostChain(box, pr);
+        const riding = this.boxRidesGhostChain(box, pr, new Set<number>(), fallingIds);
         if (riding) {
           moveX(rect, dx, this.map, others);
           moveY(rect, dy, this.map, others);
@@ -1053,7 +1254,7 @@ export class World {
    * then carry it to a second time.
    */
   private stepBoxesOwnMotion(target: number): void {
-    const all = this.boxes;
+    const all = this.wholeBoxes();
     const ghosts = this.ghostSolidsAt(this.now);
     const ordered = [...all].sort((a, b) => a.state.y - b.state.y || a.state.x - b.state.x);
     for (const box of ordered) {
@@ -1068,23 +1269,26 @@ export class World {
       // nothing else: not by a pad, not by a former self, and never sideways.
       const others = box.immovable
         ? this.boxes
-          .filter((o) => o !== box && !o.immovable)
+          .filter((o) => o !== box && !o.immovable && !this.broken.has(o.id))
           .map((o) => ({ x: o.state.x, y: o.state.y, w: o.w, h: o.h, id: o.id }))
           .concat(this.phaseSolids(), this.springs)
         : [...this.otherBoxSolids(box), ...ghosts];
       if (!box.immovable) depenetrate(rect, this.map, others);
       moveX(rect, box.state.vx * DT, this.map, others);
       const v = moveY(rect, box.state.vy * DT, this.map, others);
+      box.state.sprung = NO_SPRING;
       // If the box landed on something stop its vertical velocity. If it
-      // landed on a spring, bounce it upward instead and record the spring
-      // for the world's sprungOn (so the scene can draw and sound it).
+      // landed on a spring, bounce it upward instead and remember which spring
+      // threw it, so the scene can draw and sound the firing and a rewind
+      // through this tick fires it again.
       if (v.groundedOn === SPRING_SOLID && !box.immovable && box.state.vy >= 0) {
         // Bounce the box off the spring.
         box.state.vy = SPRING_VEL;
-        // Record which spring fired so the scene can react to it. Prefer the
-        // spring that overlaps the box's final rect.
-        const sp = this.springs.find((s) => rectsOverlap(rect, s)) ?? null;
-        this.sprungOn = sp;
+        // A spring is solid to a crate, so a crate that landed on one is flush
+        // with its plate and overlaps nothing: the spring that threw it is the
+        // one under its feet, not the one inside it.
+        const foot: Rect = { x: rect.x, y: rect.y + rect.h - 1, w: rect.w, h: 2 };
+        box.state.sprung = this.springs.findIndex((s) => rectsOverlap(foot, s));
       } else if (v.groundedOn !== GROUND_NONE || v.ceiling) {
         box.state.vy = 0;
       }
@@ -1188,12 +1392,12 @@ export class World {
     // and throws it the moment it touches, however it arrived — unless the body
     // is crouching, in which case the spring stays compressed.
     const sprung = p.vy >= 0 && !p.ducking ? (this.springs.find((sp) => rectsOverlap(rect, sp)) ?? null) : null;
+    p.sprung = sprung ? this.springs.indexOf(sprung) : NO_SPRING;
     if (sprung) {
       p.vy = SPRING_VEL;
       p.groundedOn = GROUND_NONE;
       this.buffered = 0;
       this.coyote = 0;
-      this.sprungOn = sprung;
       this.springing = true;
     }
     // Something closed on the body if resolving it took more than its own width to
@@ -1211,54 +1415,184 @@ export class World {
     }
     p.x = rect.x;
     p.y = rect.y;
-    p.groundedOn = this.sprungOn
+    // The body's own throw takes it off the ground. A crate bouncing elsewhere in
+    // the same tick is not the body's business — reading the world's firings here
+    // put the body in the air for a spring across the level it never touched.
+    p.groundedOn = sprung
       ? GROUND_NONE
       : hy.groundedOn !== GROUND_NONE
         ? hy.groundedOn
         : supportUnder(rect, this.map, this.solids());
   }
 
-  private holdsUp(box: Box, r: Rect): boolean {
-    const probe: Rect = { x: r.x, y: r.y + r.h - 2, w: r.w, h: GHOST_SUPPORT_PROBE + 2 };
-    return rectsOverlap(probe, boxRect(box));
+  /**
+   * Anything at all under a body, within reach of its feet.
+   *
+   * Deliberately looser than `supportUnder`, which decides what a body is
+   * *standing* on and has to be exact about it. This decides whether a body has
+   * nothing under it whatsoever, and the cost of being wrong is a paradox — so it
+   * takes everything solid, and everything that only sometimes is, and gives all
+   * of it the slack a settling world needs.
+   *
+   * A surface is a floor only if its top edge sits at foot level: no deeper into
+   * the body than the graze the live body walks away from (`CRUSH_DEPTH`), no
+   * further below than `FLOATING_SLACK`. That test — not the shape of the probe —
+   * is what keeps the wall beside a body from counting as the floor beneath it.
+   *
+   * Everything is judged under the actual footprint. Anything looser has to be
+   * earned by name: the rects in `lateral` — the support the record itself says
+   * the body stood on — also count within `FLOATING_SLACK` *sideways* of the
+   * footprint, at foot height. Legal footing is a pixel of lip (`standsOn`), so
+   * the crate a record stood on can settle or be nudged past the footprint
+   * entirely and still be the crate it stood on, an arm's reach away rather than
+   * gone. That grace is not extended to bystanders: crate tops recur at every
+   * height up a stack the way tile tops do up a wall, and a stack an arm's reach
+   * away must not vouch for a body its crates never held up. A slid support keeps
+   * its row's height, so the lateral window is only a graze tall — a support
+   * *below* the feet is a support underfoot, not a support beside them.
+   */
+  private restsOnSomething(r: Rect, extra: Rect[] = [], lateral: Rect[] = []): boolean {
+    const feet = r.y + r.h;
+    const topAtFeet = (s: Rect): boolean => s.y >= feet - CRUSH_DEPTH && s.y <= feet + FLOATING_SLACK;
+    const underfoot = (s: Rect): boolean => topAtFeet(s) && s.x < r.x + r.w && s.x + s.w > r.x;
+    const nearFeet = (s: Rect): boolean =>
+      Math.abs(s.y - feet) <= CRUSH_DEPTH && s.x < r.x + r.w + FLOATING_SLACK && s.x + s.w > r.x - FLOATING_SLACK;
+    // A hair past the band bottom, so a tile whose top sits exactly at
+    // `feet + FLOATING_SLACK` is enumerated at all: the tile lookup is exclusive
+    // of its bottom edge where every other solid class is scanned exhaustively.
+    const probe: Rect = { x: r.x, y: feet - CRUSH_DEPTH, w: r.w, h: CRUSH_DEPTH + FLOATING_SLACK + 1 };
+    return (
+      this.map.overlapping(probe).some(underfoot) ||
+      this.phaseSolids().some(underfoot) ||
+      this.springs.some(underfoot) ||
+      this.deviceSolids.some(underfoot) ||
+      this.wholeBoxes().some((b) => underfoot(boxRect(b))) ||
+      extra.some(underfoot) ||
+      lateral.some(nearFeet)
+    );
   }
 
+  /**
+   * Whether the world as it now stands can still hold this recorded pose up.
+   *
+   * Footing on level geometry is trusted outright: tiles never move, so whatever
+   * the record stood on there still exists. Everything else a record can stand on
+   * may have moved, toggled or been torn since, so the record's word is never
+   * grounds to condemn — what matters is whether anything is underfoot now. A
+   * block that went passable with another solid in its place, a different crate
+   * where the first one was: neither is history the world cannot produce.
+   *
+   * The record's word is consulted for one thing only, and only ever to forgive:
+   * *which* crate the body stood on. That crate — movable, so it can have settled
+   * or been nudged since — is granted `restsOnSomething`'s lateral slack. No
+   * other solid earns it: a monolith cannot be nudged sideways, and the stack
+   * beside a body was never its footing.
+   */
   private ghostIsSupportedAt(s: PlayerState): boolean {
-    const r = playerRect(s);
-    switch (s.groundedOn) {
-      case GROUND_TILE:
-        return true;
-      case PHASE_SOLID: {
-        const probe: Rect = { x: r.x, y: r.y + r.h - 2, w: r.w, h: GHOST_SUPPORT_PROBE + 2 };
-        return this.phase.some((p) => this.isSolidPhase(p) && rectsOverlap(probe, p.rect));
-      }
-      default: {
-        if (s.groundedOn >= 0) {
-          const support = this.boxes[s.groundedOn];
-          if (support && (this.holdsUp(support, r) || this.boxRidesGhostChain(support, r))) return true;
-        }
-        return supportUnder(r, this.map, this.solids()) !== GROUND_NONE;
-      }
+    if (s.groundedOn === GROUND_TILE) return true;
+    const lateral: Rect[] = [];
+    if (s.groundedOn >= 0) {
+      const support = this.boxes[s.groundedOn];
+      if (support && !support.immovable && !this.broken.has(support.id)) lateral.push(boxRect(support));
     }
+    return this.restsOnSomething(playerRect(s), [], lateral);
   }
 
+  /**
+   * A recorded body hanging still over nothing for long enough that no motion
+   * accounts for it.
+   *
+   * Both halves have to hold across the whole window. A body that is falling is
+   * not floating, and a body a hair clear of its support for a tick or two is
+   * being replayed into a world that settled slightly differently — neither is
+   * history the world cannot produce.
+   */
   private ghostIsFloatingUnsupported(run: Run, tick: number): boolean {
-    if (tick < 2) return false;
-    const samples: PlayerState[] = [];
-    for (let t = tick; t >= tick - 2; t--) {
+    return this.isFloating(tick, (t) => {
       const s = run.states[t];
-      if (!s) return false;
-      samples.push(s);
-    }
-    if (samples.length < 3) return false;
-    const unsupported = samples.every((s) => !this.ghostIsSupportedAt(s));
-    if (!unsupported) return false;
-    for (let i = 1; i < samples.length; i++) {
-      const prev = samples[i - 1];
-      const curr = samples[i];
-      if (Math.abs(curr.y - prev.y) >= GHOST_FLOATING_EPSILON) return false;
+      return s ? { y: s.y, supported: this.ghostIsSupportedAt(s) } : null;
+    });
+  }
+
+  /**
+   * The shared floating test: still, and over nothing, for `FLOATING_TICKS`.
+   * `sample` reports a body's height and whether anything held it up at a tick,
+   * or null where there is no record to judge.
+   */
+  private isFloating(tick: number, sample: (t: number) => { y: number; supported: boolean } | null): boolean {
+    const oldest = tick - (FLOATING_TICKS - 1);
+    if (oldest <= this.epochStart) return false;
+    let previous: number | null = null;
+    for (let t = tick; t >= oldest; t--) {
+      const s = sample(t);
+      if (!s || s.supported) return false;
+      if (previous !== null && Math.abs(previous - s.y) >= GHOST_FLOATING_EPSILON) return false;
+      previous = s.y;
     }
     return true;
+  }
+
+  /**
+   * A crate resting on nothing: history has it sitting still in the air, and the
+   * world as it now stands has nothing under it to explain that.
+   *
+   * Forward time never produces one — a crate whose support goes away falls. It
+   * takes a rewind, where the crates retrace records rather than obeying gravity,
+   * and a route out of the record: a button worked now that was not worked then,
+   * pulling a phase block out from under a crate that history has resting on it.
+   */
+  private boxIsFloating(box: Box): boolean {
+    if (box.immovable || this.broken.has(box.id) || this.now < box.releaseTick) return false;
+    const ghosts = this.ghostSolidsAt(this.now);
+    return this.isFloating(this.now, (t) => {
+      const s = box.record[t];
+      if (!s) return null;
+      const r: Rect = { x: s.x, y: s.y, w: box.w, h: box.h };
+      return { y: s.y, supported: this.restsOnSomething(r, ghosts) };
+    });
+  }
+
+  /** Every crate that is standing on nothing and has been for long enough to be sure. */
+  floatingBoxIds(): number[] {
+    return this.boxes.filter((box) => this.boxIsFloating(box)).map((box) => box.id);
+  }
+
+  /**
+   * Takes a crate out of the world and sets its history coming apart.
+   *
+   * It keeps its place — it is drawn where it broke, as the tear it now is — but
+   * nothing may rest on it, be stopped by it, or be held down by it, and it no
+   * longer moves. What was resting on *it* loses its support the same tick, which
+   * is how a stack goes one crate at a time.
+   */
+  breakCrate(id: number): void {
+    if (this.broken.has(id)) return;
+    this.broken.add(id);
+    this.crateParadoxes.push({ boxId: id, from: this.now, tick: this.now });
+  }
+
+  /** True once this crate's worldline has been contradicted. */
+  isBroken(box: Box): boolean {
+    return this.broken.has(box.id);
+  }
+
+  /**
+   * Runs each contradiction further back down the crate's record. The record is
+   * erased behind it: a rewind into that stretch has nothing to replay, which is
+   * the crate's past going rather than merely being disbelieved.
+   */
+  private unwriteCrateHistory(): void {
+    for (const p of this.crateParadoxes) {
+      const box = this.boxes[p.boxId];
+      const to = Math.max(this.epochStart, p.tick - UNWRITE_SPEED);
+      if (box) for (let t = p.tick; t > to; t--) box.record[t] = undefined;
+      p.tick = to;
+    }
+  }
+
+  /** True once a contradiction has run all the way back to the start of the epoch. */
+  historyUnwritten(): boolean {
+    return this.crateParadoxes.some((p) => p.tick <= this.epochStart);
   }
 
   /** The player is weightless but can shove live boxes sideways. */
@@ -1322,14 +1656,14 @@ export class World {
         }
       }
 
-      // A former self floating unsupported for three consecutive frames with
-      // essentially no y movement is impossible history: it is not standing,
-      // not falling, and not supported by anything the world can produce.
+      // A former self hanging still over nothing for `FLOATING_TICKS` of its
+      // record is impossible history: it is not standing, not falling, and not
+      // supported by anything the world can produce.
       if (this.ghostIsFloatingUnsupported(run, this.now)) {
         return { run, tick: this.now, reason: 'a former self is floating unsupported', x: g.x, y: g.y };
       }
 
-      for (const box of this.boxes) {
+      for (const box of this.wholeBoxes()) {
         if (!rectsOverlap(g, boxRect(box))) continue;
         const rec = this.boxStateAt(box, this.now);
         const recRect: Rect = { x: rec.x, y: rec.y, w: box.w, h: box.h };
@@ -1343,20 +1677,27 @@ export class World {
       }
 
       // A phase block that is now solid but has a ghost inside it: the ghost's
-      // run walked through open space that is now a wall.
+      // run walked through open space that is now a wall. Judged at the same
+      // depth as the monolith above, and for the same reason: a run's last
+      // stride off the edge of a block can lap its corner by a fraction of a
+      // pixel — whether it does is the stride's phase against the edge — and a
+      // graze the live body walked away from must not condemn the ghost that
+      // replays it.
       for (const p of this.phase) {
-        if (this.isSolidPhase(p) && rectsOverlap(g, p.rect)) {
+        if (this.isSolidPhase(p) && overlapDepth(g, p.rect) > CRUSH_DEPTH) {
           return { run, tick: this.now, reason: 'a former self is inside a phase block', x: g.x, y: g.y };
         }
       }
 
       // A ghost that was standing on a phase block (groundedOn === PHASE_SOLID)
-      // is now supported by nothing if that block went passable. Uses the same
-      // probe logic as holdsUp() for consistency.
+      // is now supported by nothing if that block went passable. Probes straight
+      // down with the same reach the ghost-carry probe uses — and a block that
+      // went passable is a paradox only if nothing has taken its place: a crate
+      // shoved into the vacated slot holds the pose up as well as the block did.
       if (state.groundedOn === PHASE_SOLID) {
         const probe: Rect = { x: g.x, y: g.y + g.h - 2, w: g.w, h: GHOST_SUPPORT_PROBE + 2 };
         const onPhase = this.phase.some((p) => this.isSolidPhase(p) && rectsOverlap(probe, p.rect));
-        if (!onPhase) {
+        if (!onPhase && !this.restsOnSomething(g)) {
           return { run, tick: this.now, reason: 'a former self was standing on a phase block', x: g.x, y: g.y };
         }
       }
@@ -1374,6 +1715,7 @@ export class World {
       ducking: false,
       groundedOn: GROUND_TILE,
       intentX: 0,
+      sprung: NO_SPRING,
     };
   }
 }

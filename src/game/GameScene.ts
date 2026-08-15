@@ -70,8 +70,21 @@ const COL_ANOMALY = 0xff4d6d;
 const COL_SPIKE = 0x93a2c4;
 const COL_SPRING = 0x9be36a;
 
-/** Minimum area (px²) of real overlap with a drawn spike that counts as touching it. */
+/**
+ * Minimum area (px²) of real overlap with a drawn spike that counts as touching it
+ * side on. A shoulder catching the wide foot of the last tooth in a run is a graze,
+ * not an impaling.
+ */
 const HAZARD_OVERLAP_MIN = 50;
+
+/**
+ * The same, for a body that has come down on the points from above (or up into them,
+ * for ceiling spikes): there is no graze to forgive, so spikes stand exactly as tall
+ * as they are drawn. A body resting level with the tips overlaps them by exactly
+ * nothing; one standing on a crate settled in a spike pit is 4px onto the points,
+ * which is 2.5px² of spike inside it, and dies.
+ */
+const HAZARD_POINT_MIN = 0.1;
 
 /** Absolute area of a polygon via the shoelace formula. */
 function polygonArea(pts: { x: number; y: number }[]): number {
@@ -161,6 +174,17 @@ function hazardOverlapArea(pr: Rect, h: Rect, inverted: boolean): number {
       ],
   );
   return area;
+}
+
+/**
+ * Whether a body has run onto a spike. Which side it met the spike from decides how
+ * much contact it takes: a body whose far edge is past the points came onto them
+ * end on and any contact at all kills, where one wholly within the spike's band
+ * walked in from the side and is held to HAZARD_OVERLAP_MIN.
+ */
+export function hazardKills(pr: Rect, h: Rect, inverted: boolean): boolean {
+  const onThePoints = inverted ? pr.y + pr.h > h.y + h.h : pr.y < h.y;
+  return hazardOverlapArea(pr, h, inverted) >= (onThePoints ? HAZARD_POINT_MIN : HAZARD_OVERLAP_MIN);
 }
 
 export const VIEW_W = 960;
@@ -429,11 +453,26 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** A spring that fired this tick: remembered for the recoil, and heard. */
+  /**
+   * A crate the world can no longer hold up is a contradiction with no run to
+   * blame: no former self put it there, and nothing beneath it says it should
+   * still be there. It comes apart where it stands, and its own past comes apart
+   * behind it, back towards the beginning of the epoch.
+   */
+  private judgeCrates(): void {
+    for (const id of this.world.floatingBoxIds()) {
+      this.world.breakCrate(id);
+      this.lastParadoxReason = 'a crate is resting on nothing';
+      sfx.paradox();
+      this.message = 'PARADOX — A CRATE IS RESTING ON NOTHING';
+    }
+  }
+
+  /** Whatever springs fired this tick: remembered for the recoil, and heard. */
   private noteSpring(): void {
-    const sp = this.world.sprungOn;
-    if (!sp) return;
-    this.springFired.set(`${sp.x},${sp.y}`, this.time.now);
+    const fired = this.world.firedSprings;
+    if (fired.length === 0) return;
+    for (const sp of fired) this.springFired.set(`${sp.x},${sp.y}`, this.time.now);
     sfx.spring();
   }
 
@@ -447,9 +486,14 @@ export class GameScene extends Phaser.Scene {
       // retracing them still gains: waiting on a pad is not a hiding place.
       this.recordLivedStep();
       this.advanceAnomalies();
+      // Nor is it a hiding place from a contradiction: the body on the pad can
+      // still step out of a button and pull a block from under a crate, and what
+      // that starts goes on eating the crate's past while the clock stands still.
+      if (this.paradoxGrace === 0) this.judgeCrates();
       if (this.anomalies.some((a) => a.idx >= this.livedPath.length - 1)) {
-        this.fail('fisheye', 'ANOMALY CAUGHT UP');
+        return this.fail('fisheye', 'ANOMALY CAUGHT UP');
       }
+      if (world.historyUnwritten()) this.fail('fisheye', 'CRATE ANOMALY REACHED THE BEGINNING OF TIME');
       return;
     }
 
@@ -470,18 +514,22 @@ export class GameScene extends Phaser.Scene {
         sfx.paradox();
         this.message = `PARADOX — ${paradox.reason.toUpperCase()}`;
       }
+      this.judgeCrates();
     }
 
     const pr = playerRect(world.player);
     // Being shoved further than your own width means something closed on you.
     if (world.crushed) return this.fail('death', 'CRUSHED');
     for (const h of this.level.hazards) {
-      if (hazardOverlapArea(pr, h, false) >= HAZARD_OVERLAP_MIN) return this.fail('death', 'KILLED BY HAZARD');
+      if (hazardKills(pr, h, false)) return this.fail('death', 'KILLED BY HAZARD');
     }
     for (const h of this.level.hazardsInverted) {
-      if (hazardOverlapArea(pr, h, true) >= HAZARD_OVERLAP_MIN) return this.fail('death', 'KILLED BY HAZARD');
+      if (hazardKills(pr, h, true)) return this.fail('death', 'KILLED BY HAZARD');
     }
     for (const box of world.boxes) {
+      // A crate that has come apart is not there to be crushed by: the body walks
+      // through the tear.
+      if (world.isBroken(box)) continue;
       const br = boxRect(box);
       const crushed = rectsOverlap(pr, { x: br.x + 3, y: br.y + 3, w: br.w - 6, h: br.h - 6 });
       if (crushed) return this.fail('death', 'CRUSHED');
@@ -489,6 +537,12 @@ export class GameScene extends Phaser.Scene {
     // The anomaly catches you by reaching your present, not by touching you.
     if (this.anomalies.some((a) => a.idx >= this.livedPath.length - 1)) {
       return this.fail('fisheye', 'ANOMALY CAUGHT UP');
+    }
+    // A crate's history running out the far end of the epoch takes the timeline
+    // with it: there is no earlier world left for the contradiction to be resolved
+    // in.
+    if (world.historyUnwritten()) {
+      return this.fail('fisheye', 'CRATE ANOMALY REACHED THE BEGINNING OF TIME');
     }
     const ex = this.level.exit;
     if (rectsOverlap(pr, { x: ex.x - ex.r, y: ex.y - ex.r, w: ex.r * 2, h: ex.r * 2 })) {
@@ -956,8 +1010,41 @@ export class GameScene extends Phaser.Scene {
     g.lineBetween(r.x + 4, r.y + r.h * 0.55, r.x + r.w - 4, r.y + r.h * 0.42);
   }
 
+  /**
+   * A crate whose worldline has been contradicted: the outline of the thing it was
+   * and the tear it is now. The contradiction eating its way back down the crate's
+   * own path is drawn with it, wherever on that path it has reached — the same
+   * mistracking as an anomaly, because it is the same kind of wound.
+   */
+  private drawTornBox(g: Phaser.GameObjects.Graphics, box: Box): void {
+    const r = boxRect(box);
+    const paradox = this.world.crateParadoxes.find((p) => p.boxId === box.id);
+    // How near the beginning of the epoch the unwriting has come, which is how
+    // near the timeline is to being over.
+    const from = paradox ? paradox.from - this.world.epochStart : 1;
+    const left = paradox ? paradox.tick - this.world.epochStart : 1;
+    const urgency = from > 0 ? 1 - Math.max(0, Math.min(1, left / from)) : 1;
+    const pulse = 0.5 + 0.5 * Math.sin(this.time.now / (220 - urgency * 90));
+    // Still a crate, and still where it was: the shape stays legible under the
+    // tear, or a torn crate reads as a hole in the level rather than a crate that
+    // has come apart.
+    g.fillStyle(COL_BOX_STRIPE_FIXED, 0.35).fillRect(r.x, r.y, r.w, r.h);
+    g.fillStyle(COL_BOX_FIXED, 0.3).fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+    g.fillStyle(COL_ANOMALY, 0.06 + 0.08 * pulse).fillRect(r.x, r.y, r.w, r.h);
+    g.lineStyle(1, COL_ANOMALY, 0.25 + 0.25 * pulse).strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    this.drawFizzle(g, r, urgency * 0.5);
+    // Where its past is being eaten, retraced from the record it still has.
+    const at = paradox ? box.record[paradox.tick] : undefined;
+    if (at) {
+      const back: Rect = { x: at.x, y: at.y, w: box.w, h: box.h };
+      g.lineStyle(1, COL_ANOMALY, 0.15 + 0.2 * pulse).strokeRect(back.x, back.y, back.w, back.h);
+      this.drawFizzle(g, back, urgency * 0.35);
+    }
+  }
+
   private drawBox(g: Phaser.GameObjects.Graphics, box: Box): void {
     if (box.immovable) return this.drawMonolith(g, box);
+    if (this.world.isBroken(box)) return this.drawTornBox(g, box);
     const r = boxRect(box);
     const rewinding = this.world.dir === -1 && !this.world.paused;
     g.fillStyle(COL_BOX_STRIPE_FIXED, 1).fillRect(r.x, r.y, r.w, r.h);

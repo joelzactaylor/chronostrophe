@@ -5,10 +5,12 @@ import { MenuScene } from './game/MenuScene';
 import { EditorScene } from './game/EditorScene';
 import { TitleScene } from './game/TitleScene';
 import { initTheme, getCurrentTheme } from './game/theme';
+import { initFullscreen } from './game/fullscreen';
 
 const HUD_H = 96;
 
 initTheme();
+initFullscreen();
 const theme = getCurrentTheme();
 const bgHex = `#${theme.bg.toString(16).padStart(6, '0')}`;
 

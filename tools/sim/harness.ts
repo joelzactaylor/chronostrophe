@@ -6,7 +6,7 @@
 import { TileMap } from '../../src/core/physics';
 import { TILE } from '../../src/core/types';
 import type { Rect } from '../../src/core/types';
-import { BoxSpec, Input, NO_INPUT, World, playerRect } from '../../src/core/world';
+import { BoxSpec, ButtonSpec, Input, NO_INPUT, PhaseSpec, World, playerRect } from '../../src/core/world';
 
 /** A Phaser Matter world as far as `World` is concerned. */
 export const fakeMatterWorld = { engine: { world: {} } } as never;
@@ -21,6 +21,9 @@ export interface Scenario {
   spawn: { x: number; y: number };
   boxes: BoxSpec[];
   devices?: Rect[];
+  springs?: Rect[];
+  buttons?: ButtonSpec[];
+  phase?: PhaseSpec[];
 }
 
 export function crate(cx: number, row: number): BoxSpec {
@@ -38,9 +41,9 @@ export function buildWorld(s: Scenario): World {
     s.spawn,
     s.boxes,
     s.devices ?? [],
-    [],
-    [],
-    [],
+    s.buttons ?? [],
+    s.phase ?? [],
+    s.springs ?? [],
     fakeMatterWorld,
   );
 }

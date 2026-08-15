@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { COLS, DeviceKind, ROWS } from './level';
-import { Draft, blankDraft, draftToCode, draftToLevel, loadDraft, saveDraft } from './draft';
+import { COLS, DeviceKind, LEVELS, ROWS } from './level';
+import { Draft, blankDraft, draftToCode, draftToLevel, levelToDraft, loadDraft, saveDraft } from './draft';
 import { VIEW_H, VIEW_W } from './GameScene';
 import { TILE } from '../core/types';
 import { fadeIn, fadeOutThen } from './transition';
@@ -131,6 +131,7 @@ export class EditorScene extends Phaser.Scene {
     kb.on('keydown-CLOSED_BRACKET', () => (this.tick = Math.min(3600, this.tick + 30)));
     kb.on('keydown-T', () => this.test());
     kb.on('keydown-X', () => this.showCode());
+    kb.on('keydown-L', () => this.loadLevel());
     kb.on('keydown-N', () => {
       if (window.confirm('Clear the level and start again?')) this.commit(blankDraft());
     });
@@ -253,6 +254,31 @@ export class EditorScene extends Phaser.Scene {
   private commit(d: Draft): void {
     this.draft = d;
     saveDraft(d);
+  }
+
+  /**
+   * Opens one of the shipped levels for editing, by name or by its number in the
+   * campaign. What comes back is the level as the editor can draw it, so exporting
+   * it again prints a level function equivalent to the one it was read from rather
+   * than the source as it was written.
+   */
+  private loadLevel(): void {
+    const levels = LEVELS.map((build, i) => ({ i, level: build() }));
+    const answer = window.prompt(`Load which level? Its name or its number.`, '');
+    if (answer === null) return;
+    const want = answer.trim().toLowerCase();
+    if (!want) return;
+    const byNumber = levels[Number(want) - 1];
+    const found =
+      (/^\d+$/.test(want) ? byNumber : undefined) ??
+      levels.find(({ level }) => level.name.toLowerCase() === want) ??
+      levels.find(({ level }) => level.name.toLowerCase().startsWith(want));
+    if (!found) {
+      window.alert(`No level called "${answer.trim()}".`);
+      return;
+    }
+    this.commit(levelToDraft(found.level));
+    sfx.menuSelect();
   }
 
   private rename(): void {
@@ -435,7 +461,7 @@ export class EditorScene extends Phaser.Scene {
     g.fillStyle(c, 0.9).fillRect(VIEW_W - 26, 8, 14, 14);
     this.status.setText(
       `${this.draft.name.toUpperCase()}   [F2] rename   [G] group ${this.group}   ` +
-      `[ ] monolith tick ${this.tick}   [T] test   [X] export   [N] clear   [ESC] menu\n` +
+      `[ ] monolith tick ${this.tick}   [T] test   [X] export   [L] load   [N] clear   [ESC] menu\n` +
       `left click places, right click clears the tile   [SHIFT]${this.shiftDown ? ' INVERTED' : ' inverted variants'}`,
     );
   }
