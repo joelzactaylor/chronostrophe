@@ -653,12 +653,21 @@ export class World {
         const s = this.boxStateAt(box, this.now);
         box.state = { ...s };
       }
-      // Restore what the phase blocks looked like at this tick so the view and
-      // the paradox judgement match history (including transient passability).
-      this.restorePhaseState(target);
     }
     this.updateButtons();
     this.updatePhaseSolids();
+    // Restore what the phase blocks looked like at this tick, in the same order a
+    // step does it: derive from the live world first, then let the tick's own
+    // record have the last word. Deriving alone leaves the blocks a tick ahead of
+    // everything else — `updatePhaseSolids` reads the ghosts and crates where the
+    // scrub has just put them, which is the solidity that governs the step *out*
+    // of this tick, while the crates still hold the poses the tick was recorded
+    // with. A block a ghost opens on the tick it is scrubbed to would open here
+    // one tick before the crate on it has fallen anywhere, and a crate still where
+    // history says it was, over a block history says was under it, is a crate
+    // resting on nothing. Live play never shows that face of the tick, because
+    // there the block opens and the crate takes its first step down together.
+    this.restorePhaseState(target);
     this.player.groundedOn = supportUnder(playerRect(this.player), this.map, this.solids());
   }
 
@@ -672,11 +681,24 @@ export class World {
    * objects react only to recorded ghost history, gravity, springs, and one
    * another — never to the idle player (or a monolith, which the level designer
    * never hangs over a pad).
+   *
+   * The buttons are read at the top of every simulated tick, exactly as a forward
+   * step reads them, because the ghosts move through this stretch and a ghost
+   * stepping into a button is what opens a phase block. Carrying one solidity
+   * across the whole stretch instead — whatever the blocks happened to be when the
+   * scrub began, which after a rewind is a solidity `restorePhaseState` restored
+   * from history — holds a crate up on a block the ghosts have already opened, and
+   * writes that hanging crate into its own record. The block then goes passable
+   * the instant the scrub lands, leaving a crate that has been resting on nothing
+   * for the whole stretch: a floating paradox for a crate that should simply have
+   * fallen, at the tick the block opened.
    */
   private simulateBoxesTo(target: number): void {
     const start = this.now;
     for (let t = start; t < target; t++) {
       this.now = t;
+      this.updateButtons();
+      this.updatePhaseSolids();
       this.stepBoxesForward(t + 1);
       this.recordBoxes(t + 1);
       // Keep the phase solidity record in step with the simulated boxes so a
@@ -777,6 +799,14 @@ export class World {
   stepPlayerFrozen(input: Input): void {
     this.updateButtons();
     this.updatePhaseSolids();
+    // The same last word the scrub gives the record, for the same reason: `now`
+    // does not move here, so every frame on the pad re-derives the blocks from
+    // ghosts and crates standing where this tick recorded them, and would hold a
+    // block open a tick early for as long as the player stands there. What the
+    // restore deliberately does *not* answer for is the live body's own standing
+    // in a button — which is the whole of how a body on a pad still opens a route,
+    // and pulls a block out from under a crate that history has resting on it.
+    this.restorePhaseState(this.now);
     this.stepPlayer(input);
     // Only the live body: `now` does not move here, so a crate or a former self
     // sitting on the tick it bounced would fire its spring again every frame the

@@ -1525,6 +1525,119 @@ function buildStepwise(): LevelDef {
   };
 }
 
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildConcentric(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 0, 0, 16); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 16); // right wall
+  fill(grid, 28, 0, 42, 0);
+  fill(grid, 6, 5, 9, 5);
+  fill(grid, 1, 15, 8, 15);
+  fill(grid, 10, 15, 12, 15);
+  fill(grid, 14, 15, 17, 15);
+  fill(grid, 19, 15, 19, 15);
+  fill(grid, 21, 15, 28, 15);
+  fill(grid, 30, 15, 30, 15);
+  fill(grid, 32, 15, 32, 15);
+  fill(grid, 34, 15, 34, 15);
+  fill(grid, 36, 15, 36, 15);
+  fill(grid, 38, 15, 42, 15);
+  fill(grid, 1, 16, 8, 16);
+  fill(grid, 10, 16, 12, 16);
+  fill(grid, 14, 16, 17, 16);
+  fill(grid, 19, 16, 19, 16);
+  fill(grid, 21, 16, 28, 16);
+  fill(grid, 30, 16, 30, 16);
+  fill(grid, 32, 16, 32, 16);
+  fill(grid, 34, 16, 34, 16);
+  fill(grid, 36, 16, 36, 16);
+  fill(grid, 38, 16, 42, 16);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Concentric',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [],
+    devices: [pad('anachroverter', 6, 15, 'ANACHROVERTER'), pad('anachroverter', 15, 15, 'ANACHROVERTER'), pad('anachroverter', 24, 15, 'ANACHROVERTER')],
+    buttons: [button(7, 5, 1), button(4, 15, 0), button(11, 15, 2), button(22, 15, 3)],
+    phase: [...phaseBlocks(0, 8, 12, 8, 14), ...phaseBlocks(0, 8, 11, 8, 11), ...phaseBlocks(0, 8, 10, 8, 10), ...phaseBlocks(0, 7, 10, 7, 10), ...phaseBlocks(0, 6, 10, 6, 10), ...phaseBlocks(0, 5, 10, 5, 10), ...phaseBlocks(0, 4, 10, 4, 10), ...phaseBlocks(0, 3, 10, 3, 10), ...phaseBlocks(0, 2, 10, 2, 10), ...phaseBlocks(0, 1, 10, 1, 10), ...phaseBlocks(2, 17, 12, 17, 14), ...phaseBlocks(2, 17, 11, 17, 11), ...phaseBlocks(2, 17, 10, 17, 10), ...phaseBlocks(2, 17, 9, 17, 9), ...phaseBlocks(2, 17, 8, 17, 8), ...phaseBlocks(2, 17, 7, 17, 7), ...phaseBlocks(2, 17, 6, 17, 6), ...phaseBlocks(2, 17, 5, 17, 5), ...phaseBlocks(2, 16, 5, 16, 5), ...phaseBlocks(2, 15, 5, 15, 5), ...phaseBlocks(2, 14, 5, 14, 5), ...phaseBlocks(2, 13, 5, 13, 5), ...phaseBlocks(2, 12, 5, 12, 5), ...phaseBlocks(2, 11, 5, 11, 5), ...phaseBlocks(2, 10, 5, 10, 5), ...phaseBlocks(2, 5, 5, 5, 5), ...phaseBlocks(2, 4, 5, 4, 5), ...phaseBlocks(2, 3, 5, 3, 5), ...phaseBlocks(2, 2, 5, 2, 5), ...phaseBlocks(2, 1, 5, 1, 5), ...phaseBlocks(3, 28, 14, 28, 14), ...phaseBlocks(3, 28, 13, 28, 13), ...phaseBlocks(3, 28, 12, 28, 12), ...phaseBlocks(3, 28, 11, 28, 11), ...phaseBlocks(3, 28, 10, 28, 10), ...phaseBlocks(3, 28, 9, 28, 9), ...phaseBlocks(3, 28, 8, 28, 8), ...phaseBlocks(3, 28, 7, 28, 7), ...phaseBlocks(3, 28, 6, 28, 6), ...phaseBlocks(3, 28, 5, 28, 5), ...phaseBlocks(3, 28, 4, 28, 4), ...phaseBlocks(3, 28, 3, 28, 3), ...phaseBlocks(3, 28, 2, 28, 2), ...phaseBlocks(3, 28, 1, 28, 1), ...phaseBlocks(1, 42, 13, 42, 13, true), ...phaseBlocks(1, 41, 13, 41, 13, true), ...phaseBlocks(1, 42, 11, 42, 11, true), ...phaseBlocks(1, 40, 9, 40, 9, true), ...phaseBlocks(1, 39, 9, 39, 9, true), ...phaseBlocks(1, 39, 7, 39, 7, true), ...phaseBlocks(0, 26, 13, 26, 13), ...phaseBlocks(0, 25, 11, 25, 11), ...phaseBlocks(0, 24, 9, 24, 9), ...phaseBlocks(0, 23, 7, 23, 7), ...phaseBlocks(0, 22, 5, 22, 5)],
+    hazards: [{ x: 9 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 33 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 35 * TILE, y: 16 * TILE, w: TILE, h: TILE }, { x: 37 * TILE, y: 16 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 1 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 2 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 3 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 4 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 5 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 6 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 7 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 8 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 9 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 10 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 11 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 12 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 13 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 14 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 15 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 16 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 17 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 19 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 20 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 22 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 23 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 0 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 0 * TILE, w: TILE, h: TILE }],
+    springs: [],
+    exit: { x: 36.5 * TILE, y: 6 * TILE - 26, r: 22 },
+  };
+}
+
+/** Add this to LEVELS, and write a comment here saying what the level asks of the player. */
+function buildIterations(): LevelDef {
+  const grid = blankGrid();
+  fill(grid, 0, 0, 0, 16); // left wall
+  fill(grid, COLS - 1, 0, COLS - 1, 15); // right wall
+  fill(grid, 9, 0, 9, 0);
+  fill(grid, 9, 1, 9, 1);
+  fill(grid, 9, 2, 9, 2);
+  fill(grid, 9, 3, 9, 3);
+  fill(grid, 9, 4, 9, 4);
+  fill(grid, 9, 5, 9, 5);
+  fill(grid, 15, 5, 15, 5);
+  fill(grid, 18, 5, 18, 5);
+  fill(grid, 21, 5, 21, 5);
+  fill(grid, 23, 5, 34, 5);
+  fill(grid, 39, 5, 40, 5);
+  fill(grid, 9, 6, 9, 6);
+  fill(grid, 15, 6, 15, 6);
+  fill(grid, 18, 6, 18, 6);
+  fill(grid, 21, 6, 21, 6);
+  fill(grid, 9, 7, 9, 7);
+  fill(grid, 15, 7, 15, 7);
+  fill(grid, 18, 7, 18, 7);
+  fill(grid, 9, 8, 9, 8);
+  fill(grid, 15, 8, 15, 8);
+  fill(grid, 23, 8, 23, 8);
+  fill(grid, 42, 8, 42, 8);
+  fill(grid, 9, 9, 9, 9);
+  fill(grid, 20, 9, 21, 9);
+  fill(grid, 23, 9, 23, 9);
+  fill(grid, 42, 9, 42, 9);
+  fill(grid, 9, 10, 9, 10);
+  fill(grid, 17, 10, 18, 10);
+  fill(grid, 20, 10, 21, 10);
+  fill(grid, 23, 10, 23, 10);
+  fill(grid, 42, 10, 42, 10);
+  fill(grid, 9, 11, 15, 11);
+  fill(grid, 17, 11, 18, 11);
+  fill(grid, 20, 11, 23, 11);
+  fill(grid, 41, 11, 42, 11);
+  fill(grid, 5, 12, 7, 12);
+  fill(grid, 15, 12, 15, 12);
+  fill(grid, 17, 12, 31, 12);
+  fill(grid, 41, 12, 42, 12);
+  fill(grid, 15, 13, 17, 13);
+  fill(grid, 34, 13, 34, 13);
+  fill(grid, 41, 13, 42, 13);
+  fill(grid, 34, 14, 34, 14);
+  fill(grid, 38, 14, 42, 14);
+  fill(grid, 1, 15, 34, 15);
+  fill(grid, 38, 15, 42, 15);
+  fill(grid, 1, 16, 39, 16);
+  const map = new TileMap(grid.map((r) => r.join('')));
+
+  return {
+    name: 'Iterations',
+    map,
+    spawn: { x: 2 * TILE, y: 15 * TILE - 28 },
+    boxes: [{ x: 5 * TILE, y: 1 * TILE - 28, w: 28, h: 28 }, { x: 6 * TILE, y: 5 * TILE - 28, w: 28, h: 28 }, { x: 7 * TILE, y: 9 * TILE - 28, w: 28, h: 28 }, { x: 26 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 25 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 27 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 28 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 29 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, { x: 24 * TILE, y: 4 * TILE - 28, w: 28, h: 28 }, monolith(35, 180)],
+    devices: [pad('chronoporter', 17, 10, 'CHRONOPORTER'), pad('chronoporter', 20, 9, 'CHRONOPORTER'), pad('anachroverter', 11, 11, 'ANACHROVERTER')],
+    buttons: [button(5, 12, 1), button(7, 12, 3), button(6, 12, 0), button(11, 15, 1), button(28, 10, 2), button(27, 10, 2), button(13, 11, 2)],
+    phase: [...phaseBlocks(1, 5, 1, 5, 1), ...phaseBlocks(1, 5, 5, 6, 5), ...phaseBlocks(1, 5, 9, 7, 9), ...phaseBlocks(2, 31, 10, 31, 10), ...phaseBlocks(2, 30, 10, 30, 10), ...phaseBlocks(2, 29, 10, 29, 10), ...phaseBlocks(2, 28, 10, 28, 10), ...phaseBlocks(1, 16, 5, 16, 7, true), ...phaseBlocks(2, 16, 10, 16, 10), ...phaseBlocks(2, 19, 9, 19, 9), ...phaseBlocks(2, 22, 8, 22, 8), ...phaseBlocks(0, 19, 6, 19, 6, true), ...phaseBlocks(0, 19, 5, 19, 5, true), ...phaseBlocks(3, 22, 5, 22, 5, true), ...phaseBlocks(3, 20, 5, 20, 5, true), ...phaseBlocks(0, 17, 6, 17, 6, true), ...phaseBlocks(0, 17, 5, 17, 5, true), ...phaseBlocks(1, 13, 5, 14, 5), ...phaseBlocks(1, 12, 5, 12, 5), ...phaseBlocks(1, 11, 5, 11, 5), ...phaseBlocks(2, 26, 10, 27, 10), ...phaseBlocks(2, 25, 10, 25, 10), ...phaseBlocks(2, 24, 10, 24, 10), ...phaseBlocks(1, 10, 5, 10, 5)],
+    hazards: [{ x: 28 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 29 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 30 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 31 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 26 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 27 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 25 * TILE, y: 11 * TILE, w: TILE, h: TILE }, { x: 24 * TILE, y: 11 * TILE, w: TILE, h: TILE }],
+    hazardsInverted: [{ x: 15 * TILE, y: 9 * TILE, w: TILE, h: TILE }, { x: 18 * TILE, y: 8 * TILE, w: TILE, h: TILE }, { x: 21 * TILE, y: 7 * TILE, w: TILE, h: TILE }],
+    springs: [spring(41, 11), spring(42, 8), spring(40, 14)],
+    exit: { x: 36.5 * TILE, y: 16 * TILE - 26, r: 22 },
+  };
+}
+
 export const LEVELS: (() => LevelDef)[] = [
   buildThreshold,
   buildInterval,
@@ -1539,6 +1652,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildOneTwo,
   buildOverhead,
   buildEscapement,
+  buildConcentric,
   buildOrder,
   buildStripes,
   buildStages,
@@ -1560,6 +1674,7 @@ export const LEVELS: (() => LevelDef)[] = [
   buildHeap,
   buildStilt,
   buildSpaghetti,
+  buildIterations,
   buildEffect,
   buildFreefalling,
 ];
