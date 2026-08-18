@@ -59,6 +59,29 @@ against its own falling end:
 - It does not hold up what is riding behind it (the carry pass's solids). Letting it
   cost the carried row a whole push step per stack, shearing the rows apart.
 
+### A row is rarely level with the row in front of it
+
+Crates are 28px on a 32px grid, so two rows only ever line up exactly when they
+stand on the same thing. A crate on a one-tile step is 4px above one standing on a
+crate below that step, 8px for a two-tile step, and so on — and a chain that only
+followed crates level to within 2px stopped at the last crate of the near row. The
+shove then died where it stood: `shoveChain` walked that crate into one nothing had
+asked to move, and the body came to a dead stop against a row it was flush with.
+
+`World.sharesRow` is the rule the chain follows instead: the crate in front joins
+if it is level with, or lower than, the one behind it, and the two still meet face
+to face. Lower only — a crate higher than the one shoving it is standing on
+whatever the near row is butted against, so a shove has nowhere to take it that
+does not go through what holds it up — and not a whole crate lower, which is the
+crate diagonally beneath, touching at a corner rather than standing in front.
+
+Whether the row that joins can actually travel is not decided there. `shoveChain`
+moves the far end first, so a front crate whose bottom is caught on the floor it
+stands beside stops everything behind it exactly as any obstruction does.
+
+`npm run sim -- step-push` shoves a row off a step into a row 4px lower, once into
+open floor and once into a pillar the front row's bottom catches on.
+
 ### Worldlines are written at the end of the tick
 
 `World.recordBoxes` runs last, after the live body has shoved and after both carry

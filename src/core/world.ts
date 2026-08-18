@@ -1037,6 +1037,32 @@ export class World {
   }
 
   /**
+   * Whether the crate in front stands in the same row as the one behind it: level
+   * with it, or lower and still meeting it face to face.
+   *
+   * Two rows are only ever exactly level when they stand on the same thing.
+   * Crates are 28px on a 32px grid, so a crate on a step is 4px above one standing
+   * on a crate below that step, 8px for a two-tile step, and so on. Read as a
+   * different row, a shove into one died where it stood: the chain ended at the
+   * last crate of the near row, `shoveChain` walked that crate straight into one
+   * nothing had asked to move, and the body stopped dead against a row it was
+   * flush with.
+   *
+   * Lower only, and only while the faces still meet. A crate higher than the one
+   * shoving it is standing on something the near row is butted against — the step
+   * itself, or the crate holding it up — so a shove has nowhere to take it that
+   * does not go through what is holding it. And a crate a whole height below is
+   * not in front of this one at all: it is the one diagonally beneath, touching at
+   * a corner. Whether the row that joins can actually travel is not decided here;
+   * `shoveChain` moves the far end first, so a front crate caught on the ground it
+   * is standing beside stops the crates behind it as any obstruction does.
+   */
+  private sharesRow(behind: Rect, front: Rect): boolean {
+    if (front.y < behind.y - 2) return false;
+    return Math.min(behind.y + behind.h, front.y + front.h) - front.y > 2;
+  }
+
+  /**
    * The run of crates a shove travels through: the crate being shoved, then each
    * one it is already up against along the direction of the shove.
    */
@@ -1070,10 +1096,9 @@ export class World {
         }
         const candidateRect = { x: candidate.state.x, y: candidate.state.y, w: candidate.w, h: candidate.h };
         if (dx !== 0) {
-          const sameRow = Math.abs(candidateRect.y - currentRect.y) < 2;
           const expectedX = currentRect.x + Math.sign(dx) * currentRect.w;
           const alongDirection = Math.sign(dx) > 0 ? candidateRect.x > currentRect.x : candidateRect.x < currentRect.x;
-          return sameRow && alongDirection && Math.abs(candidateRect.x - expectedX) < 2;
+          return this.sharesRow(currentRect, candidateRect) && alongDirection && Math.abs(candidateRect.x - expectedX) < 2;
         }
         const sameColumn = Math.abs(candidateRect.x - currentRect.x) < 2;
         const expectedY = currentRect.y + Math.sign(dy) * currentRect.h;
